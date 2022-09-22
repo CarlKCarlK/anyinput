@@ -1,6 +1,7 @@
 // cmk rename to input-like-derive (or derive-input-like)
 use proc_macro::TokenStream;
-use syn::{self, parse_macro_input, ItemFn};
+use quote::quote;
+use syn::{parse_macro_input, ItemFn};
 
 #[proc_macro_attribute]
 pub fn input_like(_: TokenStream, input: TokenStream) -> TokenStream {
@@ -9,7 +10,9 @@ pub fn input_like(_: TokenStream, input: TokenStream) -> TokenStream {
     // item
 
     let input = parse_macro_input!(input as ItemFn);
-    panic!("item: {:#?}", &input);
+    // panic!("item: {:#?}", &input);
+
+    TokenStream::from(quote!(#input))
 
     // let ast: DeriveInput = syn::parse(input.clone()).unwrap();
     // // panic!("ast: {:#?}", &ast);
