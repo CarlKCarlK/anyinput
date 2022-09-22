@@ -1,0 +1,17 @@
+[package]
+name = "input-like"
+version = "0.1.0"
+edition = "2021"
+# cmk fill in more info
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dev-dependencies]
+trybuild = { version = "1.0", features = ["diff"] }
+
+[dependencies]
+syn = { version = "1.0.60", features = ["extra-traits"] }
+quote = "1.0.9"
