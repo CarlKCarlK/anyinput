@@ -12,7 +12,13 @@ edition = "2021"
 [dev-dependencies]
 trybuild = { version = "1.0", features = ["diff"] }
 anyhow = "1.0"
+prettyplease = "0.1.0"
 
 [dependencies]
-syn = { version = "1.0.60", features = ["extra-traits", "full", "fold"] }
+syn = { version = "1.0.60", features = [
+    "extra-traits",
+    "full",
+    "fold",
+    "derive",
+] }
 quote = "1.0.9"

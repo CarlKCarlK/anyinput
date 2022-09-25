@@ -72,9 +72,10 @@
 
 #[cfg(test)]
 mod tests {
+    use prettyplease::unparse;
+    use quote::quote;
     use syn::parse_str;
-    use syn::token::{Gt, Lt};
-    use syn::{Generics, ItemFn, Signature};
+    use syn::{File, Generics, ItemFn, Signature};
 
     #[test]
     fn just_text() {
@@ -82,11 +83,14 @@ mod tests {
 
         // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
+        let mut new_params = old_fn.sig.generics.params.clone();
+        new_params.push(parse_str("S : AsRef<str>").expect("doesn't parse"));
         let new_fn = ItemFn {
             sig: Signature {
                 generics: Generics {
-                    lt_token: Some(Lt::default()),
-                    gt_token: Some(Gt::default()),
+                    lt_token: syn::parse2(quote!(<)).unwrap(),
+                    gt_token: syn::parse_str(">").unwrap(),
+                    params: new_params,
                     ..old_fn.sig.generics.clone()
                 },
                 ..old_fn.sig.clone()
@@ -99,6 +103,14 @@ mod tests {
         // generics.gt_token = Some(syn::token::Gt::default());
 
         println!("{:#?}", new_fn);
+
+        let old_file = parse_str::<File>(code).expect("doesn't parse");
+        let new_file = File {
+            items: vec![syn::Item::Fn(new_fn)],
+            ..old_file
+        };
+        let pp = unparse(&new_file);
+        println!("{}", pp);
     }
 
     #[test]
