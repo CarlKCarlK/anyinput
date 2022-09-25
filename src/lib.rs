@@ -83,7 +83,6 @@ mod tests {
     #[test]
     fn just_text() {
         let code = r#"pub fn any_str_len2(s: StringLike) -> Result<usize, anyhow::Error> {
-            let s = s.as_ref();
             let len = s.len();
             Ok(len)
         }"#;
@@ -126,6 +125,13 @@ mod tests {
         }
 
         new_params.push(parse_str("S : AsRef<str>").expect("doesn't parse"));
+
+        let mut new_stmts = old_fn.block.stmts.clone();
+        new_stmts.insert(
+            0,
+            parse_str::<syn::Stmt>("let s = s.as_ref();").expect("doesn't parse"),
+        );
+
         let new_fn = ItemFn {
             sig: Signature {
                 generics: Generics {
@@ -137,6 +143,10 @@ mod tests {
                 inputs: new_fn_args,
                 ..old_fn.sig.clone()
             },
+            block: Box::new(syn::Block {
+                stmts: new_stmts,
+                ..*old_fn.block
+            }),
             ..old_fn
         };
 
