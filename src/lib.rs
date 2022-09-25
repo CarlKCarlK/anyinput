@@ -30,26 +30,60 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 pub fn transform_fn(old_fn: ItemFn) -> ItemFn {
-    // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
-    let mut new_params = old_fn.sig.generics.params.clone();
-    // let new_inputs = Punctuated<FnArg, Comma>::new();
-    let old_inputs = &old_fn.sig.inputs;
-    // let input = parse_str::<FnArg::Typed>("")
-    // new_inputs.push(input);
+    let new_fn_args = transform_inputs(&old_fn.sig.inputs);
+    let new_params = transform_params(&old_fn.sig.generics.params);
+    let new_stmts = transform_stmts(&old_fn.block.stmts);
+
+    ItemFn {
+        sig: Signature {
+            generics: Generics {
+                lt_token: syn::parse2(quote!(<)).unwrap(),
+                gt_token: syn::parse_str(">").unwrap(), // todo use quote!
+                params: new_params,
+                ..old_fn.sig.generics.clone()
+            },
+            inputs: new_fn_args,
+            ..old_fn.sig.clone()
+        },
+        block: Box::new(syn::Block {
+            stmts: new_stmts,
+            ..*old_fn.block
+        }),
+        ..old_fn
+    }
+}
+
+fn transform_stmts(old_stmts: &Vec<syn::Stmt>) -> Vec<syn::Stmt> {
+    let mut new_stmts = old_stmts.clone();
+    new_stmts.insert(
+        0,
+        parse_str::<syn::Stmt>("let s = s.as_ref();").expect("doesn't parse"),
+    );
+    new_stmts
+}
+
+fn transform_params(
+    old_params: &Punctuated<syn::GenericParam, Comma>,
+) -> Punctuated<syn::GenericParam, Comma> {
+    let mut new_params = old_params.clone();
+    new_params.push(parse_str("S : AsRef<str>").expect("doesn't parse")); // todo use quote!
+    new_params
+}
+
+fn transform_inputs(old_inputs: &Punctuated<FnArg, Comma>) -> Punctuated<FnArg, Comma> {
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
     for old_fn_arg in old_inputs {
-        let mut replaced = false;
+        let mut replaced = false; // todo think of other ways to control the flow
         if let FnArg::Typed(typed) = old_fn_arg {
             let old_ty = &*typed.ty;
             if let Path(type_path) = old_ty {
                 let segments = &type_path.path.segments;
-                // cmk what's up with multiple segments?
+                // cmk what's up with multiple segments? why more than one?
                 for segment in segments {
-                    // cmk why more than one?
-                    // cmk println!("found StringLike");
                     let ident = &segment.ident;
                     if ident == "StringLike" {
                         let new_ty = parse_str::<syn::Type>("S").expect("doesn't parse cmk");
+                        // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
                         let new_typed = FnArg::Typed(syn::PatType {
                             ty: Box::new(new_ty),
                             ..typed.clone()
@@ -65,37 +99,14 @@ pub fn transform_fn(old_fn: ItemFn) -> ItemFn {
             new_fn_args.push(old_fn_arg.clone());
         }
     }
-
-    new_params.push(parse_str("S : AsRef<str>").expect("doesn't parse"));
-
-    let mut new_stmts = old_fn.block.stmts.clone();
-    new_stmts.insert(
-        0,
-        parse_str::<syn::Stmt>("let s = s.as_ref();").expect("doesn't parse"),
-    );
-
-    ItemFn {
-        sig: Signature {
-            generics: Generics {
-                lt_token: syn::parse2(quote!(<)).unwrap(),
-                gt_token: syn::parse_str(">").unwrap(),
-                params: new_params,
-                ..old_fn.sig.generics.clone()
-            },
-            inputs: new_fn_args,
-            ..old_fn.sig.clone()
-        },
-        block: Box::new(syn::Block {
-            stmts: new_stmts,
-            ..*old_fn.block
-        }),
-        ..old_fn
-    }
+    new_fn_args
 }
 
 #[cfg(test)]
 mod tests {
     use prettyplease::unparse;
+    use quote::quote;
+    use syn::parse_macro_input;
     use syn::parse_str;
 
     use syn::{File, ItemFn};
@@ -121,6 +132,17 @@ mod tests {
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
         let new_fn = transform_fn(old_fn);
         // println!("{:#?}", new_fn);
-        println!("{}", item_fn_to_string(new_fn));
+        let new_code = item_fn_to_string(new_fn);
+        println!("{}", new_code);
+
+        let expected_code_tokens = quote! {pub fn any_str_len2<S: AsRef<str>>(s: S) -> Result<usize, anyhow::Error> {
+            let s = s.as_ref();
+            let len = s.len();
+            Ok(len)
+        }};
+
+        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_code = item_fn_to_string(expected_item_fn);
+        assert_eq!(new_code, expected_code);
     }
 }
