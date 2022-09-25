@@ -75,15 +75,56 @@ mod tests {
     use prettyplease::unparse;
     use quote::quote;
     use syn::parse_str;
-    use syn::{File, Generics, ItemFn, Signature};
+    use syn::punctuated::Punctuated;
+    use syn::token::Comma;
+    use syn::Type::Path;
+    use syn::{File, FnArg, Generics, ItemFn, Signature};
 
     #[test]
     fn just_text() {
-        let code = "fn main() { println!(); }"; // <S:AsRef<Str>>
+        let code = r#"pub fn any_str_len2(s: StringLike) -> Result<usize, anyhow::Error> {
+            let s = s.as_ref();
+            let len = s.len();
+            Ok(len)
+        }"#;
 
         // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
         let mut new_params = old_fn.sig.generics.params.clone();
+        // let new_inputs = Punctuated<FnArg, Comma>::new();
+        let old_inputs = &old_fn.sig.inputs;
+        // let input = parse_str::<FnArg::Typed>("")
+        // new_inputs.push(input);
+        let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
+        for old_fn_arg in old_inputs {
+            let mut replaced = false;
+            if let FnArg::Typed(typed) = old_fn_arg {
+                let old_ty = &*typed.ty;
+                if let Path(type_path) = old_ty {
+                    let segments = &type_path.path.segments;
+                    // cmk what's up with multiple segments?
+                    for segment in segments {
+                        // cmk why more than one?
+                        // cmk println!("found StringLike");
+                        let ident = &segment.ident;
+                        if ident == "StringLike" {
+                            let new_ty = parse_str::<syn::Type>("S").expect("doesn't parse cmk");
+                            let new_typed = FnArg::Typed(syn::PatType {
+                                ty: Box::new(new_ty),
+                                ..typed.clone()
+                            });
+                            new_fn_args.push(new_typed);
+                            replaced = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if !replaced {
+                new_fn_args.push(old_fn_arg.clone());
+            }
+        }
+
         new_params.push(parse_str("S : AsRef<str>").expect("doesn't parse"));
         let new_fn = ItemFn {
             sig: Signature {
@@ -93,16 +134,13 @@ mod tests {
                     params: new_params,
                     ..old_fn.sig.generics.clone()
                 },
+                inputs: new_fn_args,
                 ..old_fn.sig.clone()
             },
             ..old_fn
         };
 
-        // let &mut generics = &mut item_fn.sig.generics;
-        // generics.lt_token = Some(syn::token::Lt::default());
-        // generics.gt_token = Some(syn::token::Gt::default());
-
-        println!("{:#?}", new_fn);
+        // println!("{:#?}", new_fn);
 
         let old_file = parse_str::<File>(code).expect("doesn't parse");
         let new_file = File {
