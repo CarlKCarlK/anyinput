@@ -4,70 +4,103 @@
 // cmk look a syn's macro workshop examples
 
 // Parsing based on https://github.com/dtolnay/syn/tree/master/examples/trace-var
-use proc_macro::TokenStream;
-use quote::quote;
-use syn::{
-    fold::{self, Fold},
-    parse_macro_input, Expr, ItemFn, Stmt,
-};
+// #[cfg(test)]
+// use proc_macro::TokenStream;
+// #[cfg(test)]
+// use quote::quote;
+// #[cfg(test)]
+// use syn::{parse_macro_input, ItemFn};
 
-struct Args {}
+// struct Args {}
 
-impl Fold for Args {
-    fn fold_expr(&mut self, e: Expr) -> Expr {
-        match e {
-            // Expr::Assign(e) => {
-            //     // if self.should_print_expr(&e.left) {
-            //     //     self.assign_and_print(*e.left, &e.eq_token, *e.right)
-            //     // } else {
-            //     //     Expr::Assign(fold::fold_expr_assign(self, e))
-            //     // }
-            //     panic!("Assign not supported");
-            // }
-            // Expr::AssignOp(e) => {
-            //     // if self.should_print_expr(&e.left) {
-            //     //     self.assign_and_print(*e.left, &e.op, *e.right)
-            //     // } else {
-            //     //     Expr::AssignOp(fold::fold_expr_assign_op(self, e))
-            //     // }
-            //     panic!("AssignOp not supported");
-            // }
-            _ => fold::fold_expr(self, e),
-        }
-    }
+// impl Fold for Args {
+//     fn fold_expr(&mut self, e: Expr) -> Expr {
+//         match e {
+//             // Expr::Assign(e) => {
+//             //     // if self.should_print_expr(&e.left) {
+//             //     //     self.assign_and_print(*e.left, &e.eq_token, *e.right)
+//             //     // } else {
+//             //     //     Expr::Assign(fold::fold_expr_assign(self, e))
+//             //     // }
+//             //     panic!("Assign not supported");
+//             // }
+//             // Expr::AssignOp(e) => {
+//             //     // if self.should_print_expr(&e.left) {
+//             //     //     self.assign_and_print(*e.left, &e.op, *e.right)
+//             //     // } else {
+//             //     //     Expr::AssignOp(fold::fold_expr_assign_op(self, e))
+//             //     // }
+//             //     panic!("AssignOp not supported");
+//             // }
+//             _ => fold::fold_expr(self, e),
+//         }
+//     }
 
-    fn fold_stmt(&mut self, s: Stmt) -> Stmt {
-        match s {
-            // Stmt::Local(s) => {
-            //     // if s.init.is_some() && self.should_print_pat(&s.pat) {
-            //     //     self.let_and_print(s)
-            //     // } else {
-            //     //     Stmt::Local(fold::fold_local(self, s))
-            //     // }
-            //     panic!("Local not supported");
-            // }
-            _ => fold::fold_stmt(self, s),
-        }
-    }
-}
+//     fn fold_stmt(&mut self, s: Stmt) -> Stmt {
+//         match s {
+//             // Stmt::Local(s) => {
+//             //     // if s.init.is_some() && self.should_print_pat(&s.pat) {
+//             //     //     self.let_and_print(s)
+//             //     // } else {
+//             //     //     Stmt::Local(fold::fold_local(self, s))
+//             //     // }
+//             //     panic!("Local not supported");
+//             // }
+//             _ => fold::fold_stmt(self, s),
+//         }
+//     }
+// }
 
-#[proc_macro_attribute]
-pub fn input_like(_: TokenStream, input: TokenStream) -> TokenStream {
-    // cmk 0 item
-    // panic!("item: {:#?}", &item);
-    // item
+// #[proc_macro_attribute]
+// pub fn input_like(_: TokenStream, input: TokenStream) -> TokenStream {
+//     // cmk 0 item
+//     // panic!("item: {:#?}", &item);
+//     // item
 
-    let input = parse_macro_input!(input as ItemFn);
-    // panic!("item: {:#?}", &input);
+//     let input = parse_macro_input!(input as ItemFn);
+//     // panic!("item: {:#?}", &input);
 
-    let mut args = Args {};
-    let output = args.fold_item_fn(input);
+//     // let mut args = Args {};
+//     // let output = args.fold_item_fn(input);
 
-    TokenStream::from(quote!(#output))
-}
+//     TokenStream::from(quote!(#input))
+// }
+
+// fn sample(s: &str) {
+//     println!("{}", s.as_ref());
+// }
 
 #[cfg(test)]
 mod tests {
+    use syn::parse_str;
+    use syn::token::{Gt, Lt};
+    use syn::{Generics, ItemFn, Signature};
+
+    #[test]
+    fn just_text() {
+        let code = "fn main() { println!(); }"; // <S:AsRef<Str>>
+
+        // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
+        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
+        let new_fn = ItemFn {
+            sig: Signature {
+                generics: Generics {
+                    lt_token: Some(Lt::default()),
+                    gt_token: Some(Gt::default()),
+                    ..old_fn.sig.generics.clone()
+                },
+                ..old_fn.sig.clone()
+            },
+            ..old_fn
+        };
+
+        // let &mut generics = &mut item_fn.sig.generics;
+        // generics.lt_token = Some(syn::token::Lt::default());
+        // generics.gt_token = Some(syn::token::Gt::default());
+
+        println!("{:#?}", new_fn);
+    }
+
     #[test]
     fn it_works() {
         // cmk update tests
