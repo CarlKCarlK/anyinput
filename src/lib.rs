@@ -30,13 +30,14 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 pub fn transform_fn(old_fn: ItemFn) -> ItemFn {
-    let new_fn_args = transform_inputs(&old_fn.sig.inputs);
-    let new_params = transform_params(&old_fn.sig.generics.params);
-    let new_stmts = transform_stmts(&old_fn.block.stmts);
+    let (new_fn_args, new_likes) = transform_inputs(&old_fn.sig.inputs);
+    let new_params = transform_params(&old_fn.sig.generics.params, &new_likes);
+    let new_stmts = transform_stmts(&old_fn.block.stmts, &new_likes);
 
     ItemFn {
         sig: Signature {
             generics: Generics {
+                // todo is it bad to turn on the <> when there are no *Like inputs?
                 lt_token: syn::parse2(quote!(<)).unwrap(),
                 gt_token: syn::parse_str(">").unwrap(), // todo use quote!
                 params: new_params,
@@ -53,24 +54,15 @@ pub fn transform_fn(old_fn: ItemFn) -> ItemFn {
     }
 }
 
-fn transform_stmts(old_stmts: &Vec<syn::Stmt>) -> Vec<syn::Stmt> {
-    let mut new_stmts = old_stmts.clone();
-    new_stmts.insert(
-        0,
-        parse_str::<syn::Stmt>("let s = s.as_ref();").expect("doesn't parse"),
-    );
-    new_stmts
+struct Like {
+    name: String,
+    ty: String,
 }
 
-fn transform_params(
-    old_params: &Punctuated<syn::GenericParam, Comma>,
-) -> Punctuated<syn::GenericParam, Comma> {
-    let mut new_params = old_params.clone();
-    new_params.push(parse_str("S : AsRef<str>").expect("doesn't parse")); // todo use quote!
-    new_params
-}
-
-fn transform_inputs(old_inputs: &Punctuated<FnArg, Comma>) -> Punctuated<FnArg, Comma> {
+fn transform_inputs(
+    old_inputs: &Punctuated<FnArg, Comma>,
+) -> (Punctuated<FnArg, Comma>, Vec<Like>) {
+    let mut new_likes: Vec<Like> = vec![];
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
     for old_fn_arg in old_inputs {
         let mut replaced = false; // todo think of other ways to control the flow
@@ -82,15 +74,26 @@ fn transform_inputs(old_inputs: &Punctuated<FnArg, Comma>) -> Punctuated<FnArg, 
                 for segment in segments {
                     let ident = &segment.ident;
                     if ident == "StringLike" {
-                        let new_ty = parse_str::<syn::Type>("S").expect("doesn't parse cmk");
-                        // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
-                        let new_typed = FnArg::Typed(syn::PatType {
-                            ty: Box::new(new_ty),
-                            ..typed.clone()
-                        });
-                        new_fn_args.push(new_typed);
-                        replaced = true;
-                        break;
+                        // todo use gensym to create unique names
+                        let new_type = format!("S{}", new_likes.len());
+                        let new_ty = parse_str::<syn::Type>(&new_type).expect("doesn't parse cmk");
+
+                        let pat = &*typed.pat;
+                        if let syn::Pat::Ident(pat_ident) = pat {
+                            let name = pat_ident.ident.to_string();
+
+                            let new_like = Like { name, ty: new_type };
+                            new_likes.push(new_like);
+
+                            // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
+                            let new_typed = FnArg::Typed(syn::PatType {
+                                ty: Box::new(new_ty),
+                                ..typed.clone()
+                            });
+                            new_fn_args.push(new_typed);
+                            replaced = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -99,14 +102,35 @@ fn transform_inputs(old_inputs: &Punctuated<FnArg, Comma>) -> Punctuated<FnArg, 
             new_fn_args.push(old_fn_arg.clone());
         }
     }
-    new_fn_args
+    (new_fn_args, new_likes)
+}
+
+// cmk0 wrong to use types. Should use names.
+fn transform_stmts(old_stmts: &Vec<syn::Stmt>, new_likes: &Vec<Like>) -> Vec<syn::Stmt> {
+    let mut new_stmts = old_stmts.clone();
+    for (index, new_like) in new_likes.iter().enumerate() {
+        let s = format!("let {0} = {0}.as_ref();", new_like.name);
+        new_stmts.insert(index, parse_str::<syn::Stmt>(&s).expect("doesn't parse"));
+    }
+    new_stmts
+}
+
+fn transform_params(
+    old_params: &Punctuated<syn::GenericParam, Comma>,
+    new_likes: &Vec<Like>,
+) -> Punctuated<syn::GenericParam, Comma> {
+    let mut new_params = old_params.clone();
+    for new_type in new_likes {
+        let s = format!("{}: AsRef<str>", new_type.ty);
+        new_params.push(parse_str(&s).expect("doesn't parse")); // todo use quote!
+    }
+    new_params
 }
 
 #[cfg(test)]
 mod tests {
     use prettyplease::unparse;
     use quote::quote;
-    use syn::parse_macro_input;
     use syn::parse_str;
 
     use syn::{File, ItemFn};
@@ -128,14 +152,14 @@ mod tests {
             let len = s.len();
             Ok(len)
         }"#;
-
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
+
         let new_fn = transform_fn(old_fn);
         // println!("{:#?}", new_fn);
         let new_code = item_fn_to_string(new_fn);
         println!("{}", new_code);
 
-        let expected_code_tokens = quote! {pub fn any_str_len2<S: AsRef<str>>(s: S) -> Result<usize, anyhow::Error> {
+        let expected_code_tokens = quote! {pub fn any_str_len2<S0: AsRef<str>>(s: S0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             let len = s.len();
             Ok(len)
