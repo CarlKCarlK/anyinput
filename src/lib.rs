@@ -6,27 +6,23 @@
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 
 use quote::quote;
-use syn::Pat;
-use syn::PatType;
-use syn::Type;
-use syn::__private::TokenStream;
-use syn::parse_macro_input;
-use syn::parse_str;
+use syn::__private::TokenStream; // todo don't use private
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::Type::Path;
-use syn::{FnArg, Generics, ItemFn, Signature};
+use syn::{parse2, parse_macro_input, parse_str, Block};
+use syn::{FnArg, GenericParam, Generics, ItemFn, Pat, PatType, Signature, Stmt, Type};
 
 // #[proc_macro_attribute]
 pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
     // panic!("input: {:#?}", &input);
 
-    let input = parse_macro_input!(input as ItemFn);
+    let old_item_fn = parse_macro_input!(input as ItemFn);
     // panic!("input: {:#?}", &input);
 
-    let output = transform_fn(input);
+    let new_item_fn = transform_fn(old_item_fn);
 
-    TokenStream::from(quote!(#output))
+    TokenStream::from(quote!(#new_item_fn))
 }
 
 pub fn transform_fn(old_fn: ItemFn) -> ItemFn {
@@ -46,15 +42,15 @@ pub fn transform_fn(old_fn: ItemFn) -> ItemFn {
         sig: Signature {
             generics: Generics {
                 // todo is it bad to turn on the <> when there are no *Like inputs?
-                lt_token: syn::parse2(quote!(<)).unwrap(),
-                gt_token: syn::parse_str(">").unwrap(), // todo use quote!
+                lt_token: parse2(quote!(<)).unwrap(),
+                gt_token: parse_str(">").unwrap(), // todo use quote!
                 params: new_params,
                 ..old_fn.sig.generics.clone()
             },
             inputs: new_fn_args,
             ..old_fn.sig.clone()
         },
-        block: Box::new(syn::Block {
+        block: Box::new(Block {
             stmts: new_stmts,
             ..*old_fn.block
         }),
@@ -121,21 +117,11 @@ fn transform_inputs(
     (new_fn_args, new_likes)
 }
 
-// cmk0 wrong to use types. Should use names.
-#[allow(clippy::ptr_arg)]
-fn transform_stmts(old_stmts: &Vec<syn::Stmt>, new_likes: &Vec<Like>) -> Vec<syn::Stmt> {
-    let mut new_stmts = old_stmts.clone();
-    for (index, new_like) in new_likes.iter().enumerate() {
-        let s = format!("let {0} = {0}.as_ref();", new_like.name);
-        new_stmts.insert(index, parse_str::<syn::Stmt>(&s).expect("doesn't parse"));
-    }
-    new_stmts
-}
-
+// Define generics for each special input type. For example, 'S0 : AsRef<str>'
 fn transform_params(
-    old_params: &Punctuated<syn::GenericParam, Comma>,
+    old_params: &Punctuated<GenericParam, Comma>,
     new_likes: &Vec<Like>,
-) -> Punctuated<syn::GenericParam, Comma> {
+) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
     for new_type in new_likes {
         let s = format!("{}: AsRef<str>", new_type.ty);
@@ -144,20 +130,30 @@ fn transform_params(
     new_params
 }
 
+// For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
+#[allow(clippy::ptr_arg)]
+fn transform_stmts(old_stmts: &Vec<Stmt>, new_likes: &Vec<Like>) -> Vec<Stmt> {
+    let mut new_stmts = old_stmts.clone();
+    for (index, new_like) in new_likes.iter().enumerate() {
+        let s = format!("let {0} = {0}.as_ref();", new_like.name);
+        new_stmts.insert(index, parse_str::<Stmt>(&s).expect("doesn't parse"));
+    }
+    new_stmts
+}
+
 #[cfg(test)]
 mod tests {
     use prettyplease::unparse;
     use quote::quote;
-    use syn::parse_str;
-
-    use syn::{File, ItemFn};
+    use syn::{parse2, parse_str};
+    use syn::{File, Item, ItemFn};
 
     use crate::transform_fn;
 
     fn item_fn_to_string(item_fn: ItemFn) -> String {
         let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
         let new_file = File {
-            items: vec![syn::Item::Fn(item_fn)],
+            items: vec![Item::Fn(item_fn)],
             ..old_file
         };
         unparse(&new_file)
@@ -182,7 +178,7 @@ mod tests {
             Ok(len)
         }};
 
-        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
         let expected_code = item_fn_to_string(expected_item_fn);
         assert_eq!(new_code, expected_code);
     }
@@ -205,7 +201,7 @@ mod tests {
             Ok(len)
         }};
 
-        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
         let expected_code = item_fn_to_string(expected_item_fn);
         assert_eq!(new_code, expected_code);
     }
@@ -226,7 +222,7 @@ mod tests {
             Ok(len)
         }};
 
-        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
         let expected_code = item_fn_to_string(expected_item_fn);
         assert_eq!(new_code, expected_code);
     }
@@ -250,7 +246,7 @@ mod tests {
             Ok(len)
         }};
 
-        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
         let expected_code = item_fn_to_string(expected_item_fn);
         assert_eq!(new_code, expected_code);
     }
