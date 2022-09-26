@@ -45,6 +45,15 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
         }
     }
 
+    fn iter_usize_1(new_type: Type) -> GenericParam {
+        parse_quote!(#new_type : IntoIterator<Item = usize>)
+    }
+    fn iter_usize_2(name: Ident) -> Stmt {
+        parse_quote! {
+            let #name = #name.into_iter();
+        }
+    }
+
     // cmk use Traits
     // cmk use a Hash table
     let likes = vec![
@@ -57,6 +66,11 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
             special: Ident::new("PathLike", proc_macro2::Span::call_site()),
             type_to_generic_param: &path_1,
             ident_to_stmt: &path_2,
+        },
+        Like {
+            special: Ident::new("IterUsizeLike", proc_macro2::Span::call_site()),
+            type_to_generic_param: &iter_usize_1,
+            ident_to_stmt: &iter_usize_2,
         },
     ];
 
@@ -233,26 +247,35 @@ struct Like {
 mod tests {
     // cmk use prettyplease::unparse;
     use crate::{transform_fn, UuidGenerator};
-    use syn::{parse_quote, parse_str, Type};
+    use prettyplease::unparse;
+    use syn::{parse_quote, parse_str, File, Item, ItemFn, Type};
 
     fn str_to_type(s: &str) -> Type {
         parse_str(s).unwrap()
     }
 
-    // cmk
-    // fn item_fn_to_string(item_fn: ItemFn) -> String {
-    //     let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
-    //     let new_file = File {
-    //         items: vec![Item::Fn(item_fn)],
-    //         ..old_file
-    //     };
-    //     unparse(&new_file)
-    // }
+    fn item_fn_to_string(item_fn: &ItemFn) -> String {
+        let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
+        let new_file = File {
+            items: vec![Item::Fn(item_fn.clone())],
+            ..old_file
+        };
+        unparse(&new_file)
+    }
 
     fn generic_gen_test_factory() -> impl Iterator<Item = Type> + 'static {
         (0usize..)
             .into_iter()
             .map(|i| str_to_type(&format!("S{i}")))
+    }
+
+    fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
+        if after == expected {
+            return;
+        }
+        println!("after: {}", item_fn_to_string(after));
+        println!("expected: {}", item_fn_to_string(expected));
+        panic!("after != expected");
     }
 
     #[test]
@@ -279,7 +302,7 @@ mod tests {
         }};
 
         let after = transform_fn(before, &mut generic_gen_test_factory());
-        assert_eq!(after, expected);
+        assert_item_fn_eq(&after, &expected);
     }
 
     #[test]
@@ -298,7 +321,7 @@ mod tests {
         }};
 
         let after = transform_fn(before, &mut generic_gen_test_factory());
-        assert_eq!(after, expected);
+        assert_item_fn_eq(&after, &expected);
     }
 
     #[test]
@@ -315,7 +338,7 @@ mod tests {
         }};
 
         let after = transform_fn(before, &mut generic_gen_test_factory());
-        assert_eq!(after, expected);
+        assert_item_fn_eq(&after, &expected);
     }
 
     #[test]
@@ -333,7 +356,7 @@ mod tests {
         }};
 
         let after = transform_fn(before, &mut generic_gen_test_factory());
-        assert_eq!(after, expected);
+        assert_item_fn_eq(&after, &expected);
     }
 
     #[test]
@@ -348,18 +371,36 @@ mod tests {
     #[test]
     fn one_path_input() {
         let before = parse_quote! {
-        pub fn any_str_len1(p: PathLike) -> Result<usize, anyhow::Error> {
+        pub fn any_count_path(p: PathLike) -> Result<usize, anyhow::Error> {
             let count = p.iter().count();
             Ok(count)
         }        };
         let expected = parse_quote! {
-        pub fn any_str_len1<S0: AsRef<Path>>(p: S0) -> Result<usize, anyhow::Error> {
+        pub fn any_count_path<S0: AsRef<Path>>(p: S0) -> Result<usize, anyhow::Error> {
             let p = p.as_ref();
             let count = p.iter().count();
             Ok(count)
         }};
 
         let after = transform_fn(before, &mut generic_gen_test_factory());
-        assert_eq!(after, expected);
+        assert_item_fn_eq(&after, &expected);
+    }
+
+    #[test]
+    fn one_iter_usize_input() {
+        let before = parse_quote! {
+        pub fn any_count_iter(i: IterUsizeLike) -> Result<usize, anyhow::Error> {
+            let count = i.count();
+            Ok(count)
+        }        };
+        let expected = parse_quote! {
+        pub fn any_count_iter<S0: IntoIterator<Item = usize>>(i: S0) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter();
+            let count = i.count();
+            Ok(count)
+        }};
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_item_fn_eq(&after, &expected);
     }
 }
