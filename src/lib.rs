@@ -12,6 +12,7 @@ use syn::token::Comma;
 use syn::Type::Path;
 use syn::{parse_macro_input, parse_quote, parse_str, Block, Ident};
 use syn::{FnArg, GenericParam, Generics, ItemFn, Pat, PatType, Signature, Stmt};
+use uuid::Uuid;
 
 // #[proc_macro_attribute]
 pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
@@ -20,7 +21,7 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
     let old_item_fn = parse_macro_input!(input as ItemFn);
     // panic!("input: {:#?}", &input);
 
-    let new_item_fn = transform_fn(old_item_fn, &mut generic_gen_test_factory());
+    let new_item_fn = transform_fn(old_item_fn, &mut UuidGenerator::new());
 
     TokenStream::from(quote!(#new_item_fn))
 }
@@ -58,19 +59,34 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
     }
 }
 
-fn generic_gen_test_factory() -> impl Iterator<Item = syn::Type> + 'static {
-    (0usize..)
-        .into_iter()
-        .map(|i| str_to_type(&format!("S{i}")))
+struct UuidGenerator {
+    counter: usize,
+    uuid: String,
+}
+
+impl UuidGenerator {
+    fn new() -> Self {
+        Self {
+            uuid: Uuid::new_v4().to_string().replace('-', "_"),
+            counter: 0,
+        }
+    }
+}
+
+impl Iterator for UuidGenerator {
+    type Item = syn::Type;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let s = format!("U{}_{}", self.uuid, self.counter);
+        let result = parse_str(&s).expect("parse failure"); // cmk
+        self.counter += 1;
+        Some(result)
+    }
 }
 
 struct Special {
     _name: Ident,
     ty: syn::Type,
-}
-
-fn str_to_type(s: &str) -> syn::Type {
-    parse_str(s).unwrap()
 }
 
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
@@ -117,8 +133,8 @@ fn transform_inputs(
                             // Create a new input with a generic type and remember the name and type.
                             found_special = true;
 
-                            let new_type_ident =
-                                generic_gen.next().expect("Can't gen a new generic name");
+                            let next = generic_gen.next(); // cmk
+                            let new_type_ident = next.expect("Can't gen a new generic name");
                             let new_type = parse_quote!(#new_type_ident);
                             let new_typed = FnArg::Typed(PatType {
                                 ty: Box::new(new_type),
@@ -176,7 +192,11 @@ mod tests {
     use syn::{parse2, parse_str};
     use syn::{File, Item, ItemFn};
 
-    use crate::{generic_gen_test_factory, str_to_type, transform_fn};
+    use crate::{transform_fn, UuidGenerator};
+
+    fn str_to_type(s: &str) -> syn::Type {
+        parse_str(s).unwrap()
+    }
 
     fn item_fn_to_string(item_fn: ItemFn) -> String {
         let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
@@ -185,6 +205,21 @@ mod tests {
             ..old_file
         };
         unparse(&new_file)
+    }
+
+    fn generic_gen_test_factory() -> impl Iterator<Item = syn::Type> + 'static {
+        (0usize..)
+            .into_iter()
+            .map(|i| str_to_type(&format!("S{i}")))
+    }
+
+    #[test]
+    fn uuid() {
+        let mut uuid_generator = UuidGenerator::new();
+        for i in 0..10 {
+            let _ = uuid_generator.next();
+            println!("{:#?}", i);
+        }
     }
 
     #[test]
@@ -277,5 +312,18 @@ mod tests {
         let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
         let expected_code = item_fn_to_string(expected_item_fn);
         assert_eq!(new_code, expected_code);
+    }
+
+    #[test]
+    fn one_input_uuid() {
+        let code = r#"pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }"#;
+        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
+
+        let new_fn = transform_fn(old_fn, &mut crate::UuidGenerator::new());
+        let new_code = item_fn_to_string(new_fn);
+        println!("{}", new_code);
     }
 }
