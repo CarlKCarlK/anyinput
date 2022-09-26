@@ -36,13 +36,29 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
             let #name = #name.as_ref();
         }
     }
+    fn path_1(new_type: Type) -> GenericParam {
+        parse_quote!(#new_type : AsRef<Path>)
+    }
+    fn path_2(name: Ident) -> Stmt {
+        parse_quote! {
+            let #name = #name.as_ref();
+        }
+    }
+
     // cmk use Traits
     // cmk use a Hash table
-    let likes = vec![Like {
-        special: Ident::new("StringLike", proc_macro2::Span::call_site()),
-        type_to_generic_param: &string_1,
-        ident_to_stmt: &string_2,
-    }];
+    let likes = vec![
+        Like {
+            special: Ident::new("StringLike", proc_macro2::Span::call_site()),
+            type_to_generic_param: &string_1,
+            ident_to_stmt: &string_2,
+        },
+        Like {
+            special: Ident::new("PathLike", proc_macro2::Span::call_site()),
+            type_to_generic_param: &path_1,
+            ident_to_stmt: &path_2,
+        },
+    ];
 
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen, likes);
@@ -327,5 +343,23 @@ mod tests {
             Ok(len)
         }};
         let _ = transform_fn(before, &mut generic_gen_test_factory());
+    }
+
+    #[test]
+    fn one_path_input() {
+        let before = parse_quote! {
+        pub fn any_str_len1(p: PathLike) -> Result<usize, anyhow::Error> {
+            let count = p.iter().count();
+            Ok(count)
+        }        };
+        let expected = parse_quote! {
+        pub fn any_str_len1<S0: AsRef<Path>>(p: S0) -> Result<usize, anyhow::Error> {
+            let p = p.as_ref();
+            let count = p.iter().count();
+            Ok(count)
+        }};
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_eq!(after, expected);
     }
 }
