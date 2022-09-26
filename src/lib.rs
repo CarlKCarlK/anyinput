@@ -1,6 +1,7 @@
 // todo rename to input-like-derive (or derive-input-like)
 // todo remove cargo stuff features of syn no longer needed.
 // todo use AST spans test so that problems with the user's syntax are reported correctly
+// todo add nice error enum
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 
@@ -27,17 +28,17 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = String>) -> ItemFn {
-    // Look for function inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
-    let (new_fn_args, new_likes) = transform_inputs(&old_fn.sig.inputs, generic_gen);
+    // Check that function for special inputs such as 's: StringLike'. If found, replace with generics like 's: S0' and remember.
+    let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen);
 
-    // Define generics for each special input type. For example, 'S0 : AsRef<str>'
-    let new_params = transform_params(&old_fn.sig.generics.params, &new_likes);
+    // For each special input found, add a generic, for example, 'S0 : AsRef<str>'
+    let new_generics = transform_generics(&old_fn.sig.generics.params, &specials);
 
-    // For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
-    let new_stmts = transform_stmts(&old_fn.block.stmts, &new_likes);
+    // For each special input found, add a statement defining a new local variable. For example, 'let s = s.as_ref();'
+    let new_stmts = transform_stmts(&old_fn.block.stmts, &specials);
 
-    // Create a new function with the transformed inputs, params, and statements.
-    // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
+    // Create a new function with the transformed inputs, generics, and statements.
+    // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
     // todo Is this the best way to create a new function from an old one?
     ItemFn {
         sig: Signature {
@@ -45,10 +46,10 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
                 // todo is it bad to turn on the <> when there are no special inputs?
                 lt_token: parse2(quote!(<)).unwrap(),
                 gt_token: parse_str(">").unwrap(), // todo use quote!
-                params: new_params,
+                params: new_generics,
                 ..old_fn.sig.generics.clone()
             },
-            inputs: new_fn_args,
+            inputs: new_inputs,
             ..old_fn.sig.clone()
         },
         block: Box::new(Block {
@@ -59,7 +60,7 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
     }
 }
 
-struct Like {
+struct Special {
     name: String,
     ty: String,
 }
@@ -73,29 +74,36 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     }
 }
 
-// Look for function inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
-// Todo support: PathLike, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
+// Look for special inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
+// Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = String>,
-) -> (Punctuated<FnArg, Comma>, Vec<Like>) {
-    // For each old input, create a new input, transforming the type if it is a special type.
+) -> (Punctuated<FnArg, Comma>, Vec<Special>) {
+    // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
     // Remember the names and types of the special inputs.
-    let mut new_likes: Vec<Like> = vec![];
+    let mut specials: Vec<Special> = vec![];
 
+    // todo make this const somewhere
     let string_like_ident = syn::Ident::new("StringLike", proc_macro2::Span::call_site());
 
     for old_fn_arg in old_inputs {
         let mut found_special = false; // todo think of other ways to control the flow
 
         // If the input is 'Typed' (so not self), and
-        // the 'variable' is variant 'Ident' (so not, for example, a macro), and
+        // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
         // the type is 'Path' (so not, for example, a macro), and
-        // the type's length is 1, and the type's one name is, for example, 'StringLike'
-        if let FnArg::Typed(typed) = old_fn_arg {
-            if let Pat::Ident(pat_ident) = &*typed.pat {
-                if let Path(type_path) = &*typed.ty {
+        // the one and only item in path is, for example, 'StringLike'
+        // then replace the type with a generic type.
+        //
+        // see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
+        // todo: Do these struct contains Box to make them easier to modify?
+        // The box pattern syntax is experimental and can't use used in stable Rust.
+
+        if let FnArg::Typed(pat_type) = old_fn_arg {
+            if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                if let Path(type_path) = &*pat_type.ty {
                     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
                         if segment.ident == string_like_ident {
                             // Create a new input with a generic type and remember the name and type.
@@ -107,15 +115,15 @@ fn transform_inputs(
                             let new_ty = parse_str::<Type>(&new_type_as_string).unwrap();
                             let new_typed = FnArg::Typed(PatType {
                                 ty: Box::new(new_ty),
-                                ..typed.clone()
+                                ..pat_type.clone()
                             });
                             new_fn_args.push(new_typed);
 
-                            let new_like = Like {
+                            let special = Special {
                                 name: pat_ident.ident.to_string(),
                                 ty: new_type_as_string,
                             };
-                            new_likes.push(new_like);
+                            specials.push(special);
                         }
                     }
                 }
@@ -125,16 +133,16 @@ fn transform_inputs(
             new_fn_args.push(old_fn_arg.clone());
         }
     }
-    (new_fn_args, new_likes)
+    (new_fn_args, specials)
 }
 
 // Define generics for each special input type. For example, 'S0 : AsRef<str>'
-fn transform_params(
+fn transform_generics(
     old_params: &Punctuated<GenericParam, Comma>,
-    new_likes: &Vec<Like>,
+    specials: &Vec<Special>,
 ) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
-    for new_type in new_likes {
+    for new_type in specials {
         let s = format!("{}: AsRef<str>", new_type.ty);
         new_params.push(parse_str(&s).expect("doesn't parse")); // todo use quote!
     }
@@ -143,10 +151,10 @@ fn transform_params(
 
 // For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
 #[allow(clippy::ptr_arg)]
-fn transform_stmts(old_stmts: &Vec<Stmt>, new_likes: &Vec<Like>) -> Vec<Stmt> {
+fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> {
     let mut new_stmts = old_stmts.clone();
-    for (index, new_like) in new_likes.iter().enumerate() {
-        let s = format!("let {0} = {0}.as_ref();", new_like.name);
+    for (index, special) in specials.iter().enumerate() {
+        let s = format!("let {0} = {0}.as_ref();", special.name);
         new_stmts.insert(index, parse_str::<Stmt>(&s).expect("doesn't parse"));
     }
     new_stmts
