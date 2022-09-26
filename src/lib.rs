@@ -187,25 +187,23 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> 
 
 #[cfg(test)]
 mod tests {
-    use prettyplease::unparse;
-    use quote::quote;
-    use syn::{parse2, parse_str};
-    use syn::{File, Item, ItemFn};
-
+    // cmk use prettyplease::unparse;
     use crate::{transform_fn, UuidGenerator};
+    use syn::{parse_quote, parse_str};
 
     fn str_to_type(s: &str) -> syn::Type {
         parse_str(s).unwrap()
     }
 
-    fn item_fn_to_string(item_fn: ItemFn) -> String {
-        let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
-        let new_file = File {
-            items: vec![Item::Fn(item_fn)],
-            ..old_file
-        };
-        unparse(&new_file)
-    }
+    // cmk
+    // fn item_fn_to_string(item_fn: ItemFn) -> String {
+    //     let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
+    //     let new_file = File {
+    //         items: vec![Item::Fn(item_fn)],
+    //         ..old_file
+    //     };
+    //     unparse(&new_file)
+    // }
 
     fn generic_gen_test_factory() -> impl Iterator<Item = syn::Type> + 'static {
         (0usize..)
@@ -224,106 +222,82 @@ mod tests {
 
     #[test]
     fn one_input() {
-        let code = r#"pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {
+        pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
-        }"#;
-        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-
-        let new_fn = transform_fn(old_fn, &mut generic_gen_test_factory());
-        // println!("{:#?}", new_fn);
-        let new_code = item_fn_to_string(new_fn);
-        println!("{}", new_code);
-
-        let expected_code_tokens = quote! {pub fn any_str_len1<S0: AsRef<str>>(s: S0) -> Result<usize, anyhow::Error> {
+        }        };
+        let expected = parse_quote! {
+        pub fn any_str_len1<S0: AsRef<str>>(s: S0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             let len = s.len();
             Ok(len)
         }};
 
-        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
-        let expected_code = item_fn_to_string(expected_item_fn);
-        assert_eq!(new_code, expected_code);
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_eq!(after, expected);
     }
 
     #[test]
     fn two_inputs() {
-        let code = r#"pub fn any_str_len2(a: StringLike, b: StringLike) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {
+        pub fn any_str_len2(a: StringLike, b: StringLike) -> Result<usize, anyhow::Error> {
             let len = a.len() + b.len();
             Ok(len)
-        }"#;
-        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-        let new_fn = transform_fn(old_fn, &mut generic_gen_test_factory());
-        let new_code = item_fn_to_string(new_fn);
-        println!("{}", new_code);
-
-        let expected_code_tokens = quote! {pub fn any_str_len2<S0: AsRef<str>, S1: AsRef<str>>(a: S0, b: S1) -> Result<usize, anyhow::Error> {
+        }};
+        let expected = parse_quote! {
+        pub fn any_str_len2<S0: AsRef<str>, S1: AsRef<str>>(a: S0, b: S1) -> Result<usize, anyhow::Error> {
             let a = a.as_ref();
             let b = b.as_ref();
             let len = a.len() + b.len();
             Ok(len)
         }};
 
-        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
-        let expected_code = item_fn_to_string(expected_item_fn);
-        assert_eq!(new_code, expected_code);
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_eq!(after, expected);
     }
 
     #[test]
     fn zero_inputs() {
-        let code = r#"pub fn any_str_len0() -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {
+        pub fn any_str_len0() -> Result<usize, anyhow::Error> {
             let len = 0;
             Ok(len)
-        }"#;
-        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-        let new_fn = transform_fn(old_fn, &mut generic_gen_test_factory());
-        let new_code = item_fn_to_string(new_fn);
-        println!("{}", new_code);
-
-        let expected_code_tokens = quote! {pub fn any_str_len0<>() -> Result<usize, anyhow::Error> {
+        }};
+        let expected = parse_quote! {
+        pub fn any_str_len0<>() -> Result<usize, anyhow::Error> {
             let len = 0;
             Ok(len)
         }};
 
-        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
-        let expected_code = item_fn_to_string(expected_item_fn);
-        assert_eq!(new_code, expected_code);
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_eq!(after, expected);
     }
 
     #[test]
     fn one_plus_two_input() {
-        let code = r#"pub fn any_str_len1plus2(a: usize, s: StringLike, b: usize) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {
+        pub fn any_str_len1plus2(a: usize, s: StringLike, b: usize) -> Result<usize, anyhow::Error> {
             let len = s.len()+a+b;
             Ok(len)
-        }"#;
-        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-
-        let new_fn = transform_fn(old_fn, &mut generic_gen_test_factory());
-        // println!("{:#?}", new_fn);
-        let new_code = item_fn_to_string(new_fn);
-        println!("{}", new_code);
-
-        let expected_code_tokens = quote! {pub fn any_str_len1plus2<S0: AsRef<str>>(a: usize, s: S0, b: usize) -> Result<usize, anyhow::Error> {
+        }};
+        let expected = parse_quote! {
+        pub fn any_str_len1plus2<S0: AsRef<str>>(a: usize, s: S0, b: usize) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             let len = s.len()+a+b;
             Ok(len)
         }};
 
-        let expected_item_fn = parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
-        let expected_code = item_fn_to_string(expected_item_fn);
-        assert_eq!(new_code, expected_code);
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_eq!(after, expected);
     }
 
     #[test]
     fn one_input_uuid() {
-        let code = r#"pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
-        }"#;
-        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-
-        let new_fn = transform_fn(old_fn, &mut crate::UuidGenerator::new());
-        let new_code = item_fn_to_string(new_fn);
-        println!("{}", new_code);
+        }};
+        let _ = transform_fn(before, &mut generic_gen_test_factory());
     }
 }
