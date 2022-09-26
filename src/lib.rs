@@ -147,8 +147,8 @@ mod tests {
     }
 
     #[test]
-    fn just_text() {
-        let code = r#"pub fn any_str_len2(s: StringLike) -> Result<usize, anyhow::Error> {
+    fn one_input() {
+        let code = r#"pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }"#;
@@ -159,9 +159,53 @@ mod tests {
         let new_code = item_fn_to_string(new_fn);
         println!("{}", new_code);
 
-        let expected_code_tokens = quote! {pub fn any_str_len2<S0: AsRef<str>>(s: S0) -> Result<usize, anyhow::Error> {
+        let expected_code_tokens = quote! {pub fn any_str_len1<S0: AsRef<str>>(s: S0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             let len = s.len();
+            Ok(len)
+        }};
+
+        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_code = item_fn_to_string(expected_item_fn);
+        assert_eq!(new_code, expected_code);
+    }
+
+    #[test]
+    fn two_inputs() {
+        let code = r#"pub fn any_str_len2(a: StringLike, b: StringLike) -> Result<usize, anyhow::Error> {
+            let len = a.len() + b.len();
+            Ok(len)
+        }"#;
+        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
+        let new_fn = transform_fn(old_fn);
+        let new_code = item_fn_to_string(new_fn);
+        println!("{}", new_code);
+
+        let expected_code_tokens = quote! {pub fn any_str_len2<S0: AsRef<str>, S1: AsRef<str>>(a: S0, b: S1) -> Result<usize, anyhow::Error> {
+            let a = a.as_ref();
+            let b = b.as_ref();
+            let len = a.len() + b.len();
+            Ok(len)
+        }};
+
+        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_code = item_fn_to_string(expected_item_fn);
+        assert_eq!(new_code, expected_code);
+    }
+
+    #[test]
+    fn zero_inputs() {
+        let code = r#"pub fn any_str_len0() -> Result<usize, anyhow::Error> {
+            let len = 0;
+            Ok(len)
+        }"#;
+        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
+        let new_fn = transform_fn(old_fn);
+        let new_code = item_fn_to_string(new_fn);
+        println!("{}", new_code);
+
+        let expected_code_tokens = quote! {pub fn any_str_len0<>() -> Result<usize, anyhow::Error> {
+            let len = 0;
             Ok(len)
         }};
 
