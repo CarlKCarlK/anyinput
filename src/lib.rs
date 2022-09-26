@@ -6,6 +6,9 @@
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 
 use quote::quote;
+use syn::Pat;
+use syn::PatType;
+use syn::Type;
 use syn::__private::TokenStream;
 use syn::parse_macro_input;
 use syn::parse_str;
@@ -16,24 +19,29 @@ use syn::{FnArg, Generics, ItemFn, Signature};
 
 // #[proc_macro_attribute]
 pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
-    // cmk 0 item
-    // panic!("item: {:#?}", &item);
-    // item
+    // panic!("input: {:#?}", &input);
 
     let input = parse_macro_input!(input as ItemFn);
-    // panic!("item: {:#?}", &input);
+    // panic!("input: {:#?}", &input);
 
-    // let mut args = Args {};
-    // let output = args.fold_item_fn(input);
+    let output = transform_fn(input);
 
-    TokenStream::from(quote!(#input))
+    TokenStream::from(quote!(#output))
 }
 
 pub fn transform_fn(old_fn: ItemFn) -> ItemFn {
+    // Look for function inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
     let (new_fn_args, new_likes) = transform_inputs(&old_fn.sig.inputs);
+
+    // Define generics for each special input type. For example, 'S0 : AsRef<str>'
     let new_params = transform_params(&old_fn.sig.generics.params, &new_likes);
+
+    // For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
     let new_stmts = transform_stmts(&old_fn.block.stmts, &new_likes);
 
+    // Create a new function with the transformed inputs, params, and statements.
+    // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
+    // todo Is this the best way to create a new function from an old one?
     ItemFn {
         sig: Signature {
             generics: Generics {
@@ -59,46 +67,54 @@ struct Like {
     ty: String,
 }
 
+// Look for function inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
+// Todo support: PathLike, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
 ) -> (Punctuated<FnArg, Comma>, Vec<Like>) {
-    let mut new_likes: Vec<Like> = vec![];
+    // For each old input, create a new input, transforming the type if it is a special type.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
+    // Remember the names and types of the special inputs.
+    let mut new_likes: Vec<Like> = vec![];
+
     for old_fn_arg in old_inputs {
-        let mut replaced = false; // todo think of other ways to control the flow
+        let mut found_special = false; // todo think of other ways to control the flow
+
+        // If the input is 'Typed' (so not self), and
+        // the 'variable' is variant 'Ident' (so not, for example, a macro), and
+        // the type is 'Path' (so not, for example, a macro), and
+        // the type's length is 1, and the type's one name is, for example, 'StringLike'
         if let FnArg::Typed(typed) = old_fn_arg {
-            let old_ty = &*typed.ty;
-            if let Path(type_path) = old_ty {
-                let segments = &type_path.path.segments;
-                // cmk what's up with multiple segments? why more than one?
-                for segment in segments {
-                    let ident = &segment.ident;
-                    if ident == "StringLike" {
-                        // todo use gensym to create unique names
-                        let new_type = format!("S{}", new_likes.len());
-                        let new_ty = parse_str::<syn::Type>(&new_type).expect("doesn't parse cmk");
+            if let Pat::Ident(pat_ident) = &*typed.pat {
+                if let Path(type_path) = &*typed.ty {
+                    let segments = &type_path.path.segments;
+                    if segments.len() == 1 {
+                        let type_ident = &segments[0].ident;
+                        if type_ident == "StringLike" {
+                            // Create a new input with a generic type and remember the name and type.
+                            found_special = true;
 
-                        let pat = &*typed.pat;
-                        if let syn::Pat::Ident(pat_ident) = pat {
-                            let name = pat_ident.ident.to_string();
-
-                            let new_like = Like { name, ty: new_type };
-                            new_likes.push(new_like);
-
-                            // using Rust's struct update syntax https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/
-                            let new_typed = FnArg::Typed(syn::PatType {
+                            // todo use gensym to create unique names
+                            let new_type_as_string = format!("S{}", new_likes.len());
+                            // todo use quote!
+                            let new_ty = parse_str::<Type>(&new_type_as_string).unwrap();
+                            let new_typed = FnArg::Typed(PatType {
                                 ty: Box::new(new_ty),
                                 ..typed.clone()
                             });
                             new_fn_args.push(new_typed);
-                            replaced = true;
-                            break;
+
+                            let new_like = Like {
+                                name: pat_ident.ident.to_string(),
+                                ty: new_type_as_string,
+                            };
+                            new_likes.push(new_like);
                         }
                     }
                 }
             }
         }
-        if !replaced {
+        if !found_special {
             new_fn_args.push(old_fn_arg.clone());
         }
     }
@@ -106,6 +122,7 @@ fn transform_inputs(
 }
 
 // cmk0 wrong to use types. Should use names.
+#[allow(clippy::ptr_arg)]
 fn transform_stmts(old_stmts: &Vec<syn::Stmt>, new_likes: &Vec<Like>) -> Vec<syn::Stmt> {
     let mut new_stmts = old_stmts.clone();
     for (index, new_like) in new_likes.iter().enumerate() {
