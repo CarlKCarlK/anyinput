@@ -213,4 +213,28 @@ mod tests {
         let expected_code = item_fn_to_string(expected_item_fn);
         assert_eq!(new_code, expected_code);
     }
+
+    #[test]
+    fn one_plus_two_input() {
+        let code = r#"pub fn any_str_len1plus2(a: usize, s: StringLike, b: usize) -> Result<usize, anyhow::Error> {
+            let len = s.len()+a+b;
+            Ok(len)
+        }"#;
+        let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
+
+        let new_fn = transform_fn(old_fn);
+        // println!("{:#?}", new_fn);
+        let new_code = item_fn_to_string(new_fn);
+        println!("{}", new_code);
+
+        let expected_code_tokens = quote! {pub fn any_str_len1plus2<S0: AsRef<str>>(a: usize, s: S0, b: usize) -> Result<usize, anyhow::Error> {
+            let s = s.as_ref();
+            let len = s.len()+a+b;
+            Ok(len)
+        }};
+
+        let expected_item_fn = syn::parse2::<ItemFn>(expected_code_tokens).expect("doesn't parse");
+        let expected_code = item_fn_to_string(expected_item_fn);
+        assert_eq!(new_code, expected_code);
+    }
 }
