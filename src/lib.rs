@@ -28,8 +28,24 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::Type>) -> ItemFn {
+    fn string_1(new_type: Type) -> GenericParam {
+        parse_quote!(#new_type : AsRef<str>)
+    }
+    fn string_2(name: Ident) -> Stmt {
+        parse_quote! {
+            let #name = #name.as_ref();
+        }
+    }
+    // cmk use Traits
+    // cmk use a Hash table
+    let likes = vec![Like {
+        special: Ident::new("StringLike", proc_macro2::Span::call_site()),
+        type_to_generic_param: &string_1,
+        ident_to_stmt: &string_2,
+    }];
+
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
-    let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen);
+    let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen, likes);
 
     // For each special input found, define a new generic, for example, 'S0 : AsRef<str>'
     let new_generics = transform_generics(&old_fn.sig.generics.params, &specials);
@@ -88,6 +104,7 @@ impl Iterator for UuidGenerator {
 struct Special {
     name: Ident,
     ty: Type,
+    like: Like,
 }
 
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
@@ -104,14 +121,12 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = Type>,
+    likes: Vec<Like>,
 ) -> (Punctuated<FnArg, Comma>, Vec<Special>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
     // Remember the names and types of the special inputs.
     let mut specials: Vec<Special> = vec![];
-
-    // todo make this const somewhere
-    let string_like_ident = Ident::new("StringLike", proc_macro2::Span::call_site()); //cmks
 
     for old_fn_arg in old_inputs {
         let mut found_special = false; // todo think of other ways to control the flow
@@ -130,23 +145,26 @@ fn transform_inputs(
             if let Pat::Ident(pat_ident) = &*pat_type.pat {
                 if let Path(type_path) = &*pat_type.ty {
                     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-                        if segment.ident == string_like_ident {
-                            // Create a new input with a generic type and remember the name and type.
-                            found_special = true;
+                        for like in &likes {
+                            if segment.ident == like.special {
+                                // Create a new input with a generic type and remember the name and type.
+                                found_special = true;
 
-                            let new_type = generic_gen.next().unwrap();
+                                let new_type = generic_gen.next().unwrap();
 
-                            let new_fn_arg = FnArg::Typed(PatType {
-                                ty: Box::new(new_type.clone()),
-                                ..pat_type.clone()
-                            });
-                            new_fn_args.push(new_fn_arg);
+                                new_fn_args.push(FnArg::Typed(PatType {
+                                    ty: Box::new(new_type.clone()),
+                                    ..pat_type.clone()
+                                }));
 
-                            let special = Special {
-                                name: pat_ident.ident.clone(),
-                                ty: new_type,
-                            };
-                            specials.push(special);
+                                specials.push(Special {
+                                    name: pat_ident.ident.clone(),
+                                    ty: new_type,
+                                    like: like.clone(),
+                                });
+
+                                break;
+                            }
                         }
                     }
                 }
@@ -166,8 +184,12 @@ fn transform_generics(
     specials: &Vec<Special>,
 ) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
-    for new_type in specials.iter().map(|s| &s.ty) {
-        new_params.push(parse_quote!(#new_type : AsRef<str>)); //cmks
+    for special in specials.iter() {
+        // cmk why run this here. It could be run much earlier.
+        // cmk why does the type_to_gp function need a move input?
+        let new_type = special.ty.clone();
+        let new_param = (special.like.type_to_generic_param)(new_type);
+        new_params.push(new_param);
     }
     new_params
 }
@@ -176,13 +198,19 @@ fn transform_generics(
 #[allow(clippy::ptr_arg)]
 fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> {
     let mut new_stmts = old_stmts.clone();
-    for (index, name) in specials.iter().map(|special| &special.name).enumerate() {
-        let new_stmt = parse_quote! {
-            let #name = #name.as_ref(); //cmks
-        };
+    for (index, special) in specials.iter().enumerate() {
+        let name = special.name.clone();
+        let new_stmt = (special.like.ident_to_stmt)(name);
         new_stmts.insert(index, new_stmt);
     }
     new_stmts
+}
+
+#[derive(Clone)]
+struct Like {
+    special: Ident,
+    type_to_generic_param: &'static dyn Fn(Type) -> GenericParam,
+    ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
 
 #[cfg(test)]
