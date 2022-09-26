@@ -111,7 +111,7 @@ fn transform_inputs(
     let mut specials: Vec<Special> = vec![];
 
     // todo make this const somewhere
-    let string_like_ident = Ident::new("StringLike", proc_macro2::Span::call_site());
+    let string_like_ident = Ident::new("StringLike", proc_macro2::Span::call_site()); //cmks
 
     for old_fn_arg in old_inputs {
         let mut found_special = false; // todo think of other ways to control the flow
@@ -134,18 +134,17 @@ fn transform_inputs(
                             // Create a new input with a generic type and remember the name and type.
                             found_special = true;
 
-                            let next = generic_gen.next(); // cmk
-                            let new_type_ident = next.expect("Can't gen a new generic name");
-                            let new_type = parse_quote!(#new_type_ident);
-                            let new_typed = FnArg::Typed(PatType {
-                                ty: Box::new(new_type),
+                            let new_type = generic_gen.next().unwrap();
+
+                            let new_fn_arg = FnArg::Typed(PatType {
+                                ty: Box::new(new_type.clone()),
                                 ..pat_type.clone()
                             });
-                            new_fn_args.push(new_typed);
+                            new_fn_args.push(new_fn_arg);
 
                             let special = Special {
                                 name: pat_ident.ident.clone(),
-                                ty: new_type_ident,
+                                ty: new_type,
                             };
                             specials.push(special);
                         }
@@ -168,7 +167,7 @@ fn transform_generics(
 ) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
     for new_type in specials.iter().map(|s| &s.ty) {
-        new_params.push(parse_quote!(#new_type : AsRef<str>));
+        new_params.push(parse_quote!(#new_type : AsRef<str>)); //cmks
     }
     new_params
 }
@@ -179,7 +178,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> 
     let mut new_stmts = old_stmts.clone();
     for (index, name) in specials.iter().map(|special| &special.name).enumerate() {
         let new_stmt = parse_quote! {
-            let #name = #name.as_ref();
+            let #name = #name.as_ref(); //cmks
         };
         new_stmts.insert(index, new_stmt);
     }
