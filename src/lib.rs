@@ -5,7 +5,7 @@
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::__private::TokenStream; // todo don't use private
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
@@ -21,13 +21,13 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
     // panic!("input: {:#?}", &input);
 
     // todo create unique names for macros identifiers with gensym
-    let mut generic_gen = (0usize..).into_iter().map(|i| format!("S{i}"));
+    let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
     let new_item_fn = transform_fn(old_item_fn, &mut generic_gen);
 
     TokenStream::from(quote!(#new_item_fn))
 }
 
-pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = String>) -> ItemFn {
+pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Ident>) -> ItemFn {
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen);
 
@@ -62,7 +62,7 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
 
 struct Special {
     _name: Ident,
-    ty: String,
+    ty: Ident,
 }
 
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
@@ -78,7 +78,7 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 // Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
-    generic_gen: &mut impl Iterator<Item = String>,
+    generic_gen: &mut impl Iterator<Item = Ident>,
 ) -> (Punctuated<FnArg, Comma>, Vec<Special>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
@@ -109,19 +109,19 @@ fn transform_inputs(
                             // Create a new input with a generic type and remember the name and type.
                             found_special = true;
 
-                            let new_type_as_string =
+                            let new_type_ident =
                                 generic_gen.next().expect("Can't gen a new generic name");
+                            let new_type = parse_quote!(#new_type_ident);
                             // todo use quote!
-                            let new_ty = parse_str::<Type>(&new_type_as_string).unwrap();
                             let new_typed = FnArg::Typed(PatType {
-                                ty: Box::new(new_ty),
+                                ty: Box::new(new_type),
                                 ..pat_type.clone()
                             });
                             new_fn_args.push(new_typed);
 
                             let special = Special {
                                 _name: pat_ident.ident.clone(),
-                                ty: new_type_as_string,
+                                ty: new_type_ident,
                             };
                             specials.push(special);
                         }
@@ -150,12 +150,10 @@ fn transform_generics(
 }
 
 // For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
-// todo: Is there a way to use quote! to include the loop?
 #[allow(clippy::ptr_arg)]
 fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> {
     let mut new_stmts = old_stmts.clone();
-    for (index, _special) in specials.iter().enumerate() {
-        let name = &_special._name;
+    for (index, name) in specials.iter().map(|special| &special._name).enumerate() {
         let new_stmt = parse_quote! {
             let #name = #name.as_ref();
         };
@@ -167,7 +165,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> 
 #[cfg(test)]
 mod tests {
     use prettyplease::unparse;
-    use quote::quote;
+    use quote::{format_ident, quote};
     use syn::{parse2, parse_str};
     use syn::{File, Item, ItemFn};
 
@@ -190,7 +188,7 @@ mod tests {
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
 
-        let mut generic_gen = (0usize..).into_iter().map(|i| format!("S{i}"));
+        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         // println!("{:#?}", new_fn);
         let new_code = item_fn_to_string(new_fn);
@@ -214,7 +212,7 @@ mod tests {
             Ok(len)
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-        let mut generic_gen = (0usize..).into_iter().map(|i| format!("S{i}"));
+        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         let new_code = item_fn_to_string(new_fn);
         println!("{}", new_code);
@@ -238,7 +236,7 @@ mod tests {
             Ok(len)
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-        let mut generic_gen = (0usize..).into_iter().map(|i| format!("S{i}"));
+        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         let new_code = item_fn_to_string(new_fn);
         println!("{}", new_code);
@@ -261,7 +259,7 @@ mod tests {
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
 
-        let mut generic_gen = (0usize..).into_iter().map(|i| format!("S{i}"));
+        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         // println!("{:#?}", new_fn);
         let new_code = item_fn_to_string(new_fn);
