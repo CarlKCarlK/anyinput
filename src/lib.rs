@@ -1,6 +1,7 @@
 // todo rename to input-like-derive (or derive-input-like)
 // todo remove cargo stuff features of syn no longer needed.
 // todo use AST spans test so that problems with the user's syntax are reported correctly
+//           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 // todo add nice error enum
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
@@ -10,7 +11,7 @@ use syn::__private::TokenStream; // todo don't use private
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::Type::Path;
-use syn::{parse_macro_input, parse_quote, parse_str, Block, Ident};
+use syn::{parse_macro_input, parse_quote, parse_str, Block, Ident, Type};
 use syn::{FnArg, GenericParam, Generics, ItemFn, Pat, PatType, Signature, Stmt};
 use uuid::Uuid;
 
@@ -74,7 +75,7 @@ impl UuidGenerator {
 }
 
 impl Iterator for UuidGenerator {
-    type Item = syn::Type;
+    type Item = Type;
 
     fn next(&mut self) -> Option<Self::Item> {
         let s = format!("U{}_{}", self.uuid, self.counter);
@@ -85,8 +86,8 @@ impl Iterator for UuidGenerator {
 }
 
 struct Special {
-    _name: Ident,
-    ty: syn::Type,
+    name: Ident,
+    ty: Type,
 }
 
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
@@ -102,7 +103,7 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 // Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
-    generic_gen: &mut impl Iterator<Item = syn::Type>,
+    generic_gen: &mut impl Iterator<Item = Type>,
 ) -> (Punctuated<FnArg, Comma>, Vec<Special>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
@@ -110,7 +111,7 @@ fn transform_inputs(
     let mut specials: Vec<Special> = vec![];
 
     // todo make this const somewhere
-    let string_like_ident = syn::Ident::new("StringLike", proc_macro2::Span::call_site());
+    let string_like_ident = Ident::new("StringLike", proc_macro2::Span::call_site());
 
     for old_fn_arg in old_inputs {
         let mut found_special = false; // todo think of other ways to control the flow
@@ -143,7 +144,7 @@ fn transform_inputs(
                             new_fn_args.push(new_typed);
 
                             let special = Special {
-                                _name: pat_ident.ident.clone(),
+                                name: pat_ident.ident.clone(),
                                 ty: new_type_ident,
                             };
                             specials.push(special);
@@ -176,7 +177,7 @@ fn transform_generics(
 #[allow(clippy::ptr_arg)]
 fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> {
     let mut new_stmts = old_stmts.clone();
-    for (index, name) in specials.iter().map(|special| &special._name).enumerate() {
+    for (index, name) in specials.iter().map(|special| &special.name).enumerate() {
         let new_stmt = parse_quote! {
             let #name = #name.as_ref();
         };
@@ -189,9 +190,9 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> 
 mod tests {
     // cmk use prettyplease::unparse;
     use crate::{transform_fn, UuidGenerator};
-    use syn::{parse_quote, parse_str};
+    use syn::{parse_quote, parse_str, Type};
 
-    fn str_to_type(s: &str) -> syn::Type {
+    fn str_to_type(s: &str) -> Type {
         parse_str(s).unwrap()
     }
 
@@ -205,7 +206,7 @@ mod tests {
     //     unparse(&new_file)
     // }
 
-    fn generic_gen_test_factory() -> impl Iterator<Item = syn::Type> + 'static {
+    fn generic_gen_test_factory() -> impl Iterator<Item = Type> + 'static {
         (0usize..)
             .into_iter()
             .map(|i| str_to_type(&format!("S{i}")))
