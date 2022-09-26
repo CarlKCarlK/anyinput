@@ -10,7 +10,7 @@ use syn::__private::TokenStream; // todo don't use private
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::Type::Path;
-use syn::{parse2, parse_macro_input, parse_str, Block};
+use syn::{parse_macro_input, parse_quote, parse_str, Block, Ident};
 use syn::{FnArg, GenericParam, Generics, ItemFn, Pat, PatType, Signature, Stmt, Type};
 
 // #[proc_macro_attribute]
@@ -28,10 +28,10 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = String>) -> ItemFn {
-    // Check that function for special inputs such as 's: StringLike'. If found, replace with generics like 's: S0' and remember.
+    // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen);
 
-    // For each special input found, add a generic, for example, 'S0 : AsRef<str>'
+    // For each special input found, define a new generic, for example, 'S0 : AsRef<str>'
     let new_generics = transform_generics(&old_fn.sig.generics.params, &specials);
 
     // For each special input found, add a statement defining a new local variable. For example, 'let s = s.as_ref();'
@@ -43,9 +43,9 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
     ItemFn {
         sig: Signature {
             generics: Generics {
-                // todo is it bad to turn on the <> when there are no special inputs?
-                lt_token: parse2(quote!(<)).unwrap(),
-                gt_token: parse_str(">").unwrap(), // todo use quote!
+                // todo: Define all constants outside the loop
+                lt_token: parse_quote!(<),
+                gt_token: parse_quote!(>),
                 params: new_generics,
                 ..old_fn.sig.generics.clone()
             },
@@ -61,7 +61,7 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
 }
 
 struct Special {
-    name: String,
+    _name: Ident,
     ty: String,
 }
 
@@ -120,7 +120,7 @@ fn transform_inputs(
                             new_fn_args.push(new_typed);
 
                             let special = Special {
-                                name: pat_ident.ident.to_string(),
+                                _name: pat_ident.ident.clone(),
                                 ty: new_type_as_string,
                             };
                             specials.push(special);
@@ -150,12 +150,16 @@ fn transform_generics(
 }
 
 // For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
+// todo: Is there a way to use quote! to include the loop?
 #[allow(clippy::ptr_arg)]
 fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> {
     let mut new_stmts = old_stmts.clone();
-    for (index, special) in specials.iter().enumerate() {
-        let s = format!("let {0} = {0}.as_ref();", special.name);
-        new_stmts.insert(index, parse_str::<Stmt>(&s).expect("doesn't parse"));
+    for (index, _special) in specials.iter().enumerate() {
+        let name = &_special._name;
+        let new_stmt = parse_quote! {
+            let #name = #name.as_ref();
+        };
+        new_stmts.insert(index, new_stmt);
     }
     new_stmts
 }
