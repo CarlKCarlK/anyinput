@@ -64,6 +64,15 @@ struct Like {
     ty: String,
 }
 
+fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
+    let first = iter.next()?;
+    if iter.next().is_some() {
+        None
+    } else {
+        Some(first)
+    }
+}
+
 // Look for function inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
 // Todo support: PathLike, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
 fn transform_inputs(
@@ -75,6 +84,8 @@ fn transform_inputs(
     // Remember the names and types of the special inputs.
     let mut new_likes: Vec<Like> = vec![];
 
+    let string_like_ident = syn::Ident::new("StringLike", proc_macro2::Span::call_site());
+
     for old_fn_arg in old_inputs {
         let mut found_special = false; // todo think of other ways to control the flow
 
@@ -85,10 +96,8 @@ fn transform_inputs(
         if let FnArg::Typed(typed) = old_fn_arg {
             if let Pat::Ident(pat_ident) = &*typed.pat {
                 if let Path(type_path) = &*typed.ty {
-                    let segments = &type_path.path.segments;
-                    if segments.len() == 1 {
-                        let type_ident = &segments[0].ident;
-                        if type_ident == "StringLike" {
+                    if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
+                        if segment.ident == string_like_ident {
                             // Create a new input with a generic type and remember the name and type.
                             found_special = true;
 
