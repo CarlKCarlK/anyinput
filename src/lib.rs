@@ -11,7 +11,7 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::Type::Path;
 use syn::{parse_macro_input, parse_quote, parse_str, Block, Ident};
-use syn::{FnArg, GenericParam, Generics, ItemFn, Pat, PatType, Signature, Stmt, Type};
+use syn::{FnArg, GenericParam, Generics, ItemFn, Pat, PatType, Signature, Stmt};
 
 // #[proc_macro_attribute]
 pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
@@ -21,13 +21,15 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
     // panic!("input: {:#?}", &input);
 
     // todo create unique names for macros identifiers with gensym
-    let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
+    let mut generic_gen = (0usize..)
+        .into_iter()
+        .map(|i| str_to_type(&format!("S{i}")));
     let new_item_fn = transform_fn(old_item_fn, &mut generic_gen);
 
     TokenStream::from(quote!(#new_item_fn))
 }
 
-pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Ident>) -> ItemFn {
+pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::Type>) -> ItemFn {
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen);
 
@@ -62,7 +64,11 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Ident
 
 struct Special {
     _name: Ident,
-    ty: Ident,
+    ty: syn::Type,
+}
+
+fn str_to_type(s: &str) -> syn::Type {
+    parse_str(s).unwrap()
 }
 
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
@@ -78,7 +84,7 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 // Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
-    generic_gen: &mut impl Iterator<Item = Ident>,
+    generic_gen: &mut impl Iterator<Item = syn::Type>,
 ) -> (Punctuated<FnArg, Comma>, Vec<Special>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
@@ -143,8 +149,9 @@ fn transform_generics(
 ) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
     for new_type in specials {
-        let s = format!("{}: AsRef<str>", new_type.ty);
-        new_params.push(parse_str(&s).expect("doesn't parse")); // todo use quote!
+        let ty = &new_type.ty;
+        let new_param = parse_quote!(#ty : AsRef<str>);
+        new_params.push(new_param);
     }
     new_params
 }
@@ -169,7 +176,7 @@ mod tests {
     use syn::{parse2, parse_str};
     use syn::{File, Item, ItemFn};
 
-    use crate::transform_fn;
+    use crate::{str_to_type, transform_fn};
 
     fn item_fn_to_string(item_fn: ItemFn) -> String {
         let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
@@ -188,7 +195,9 @@ mod tests {
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
 
-        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
+        let mut generic_gen = (0usize..)
+            .into_iter()
+            .map(|i| str_to_type(&format!("S{i}")));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         // println!("{:#?}", new_fn);
         let new_code = item_fn_to_string(new_fn);
@@ -212,7 +221,9 @@ mod tests {
             Ok(len)
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
+        let mut generic_gen = (0usize..)
+            .into_iter()
+            .map(|i| str_to_type(&format!("S{i}")));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         let new_code = item_fn_to_string(new_fn);
         println!("{}", new_code);
@@ -236,7 +247,9 @@ mod tests {
             Ok(len)
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
-        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
+        let mut generic_gen = (0usize..)
+            .into_iter()
+            .map(|i| str_to_type(&format!("S{i}")));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         let new_code = item_fn_to_string(new_fn);
         println!("{}", new_code);
@@ -259,7 +272,9 @@ mod tests {
         }"#;
         let old_fn = parse_str::<ItemFn>(code).expect("doesn't parse");
 
-        let mut generic_gen = (0usize..).into_iter().map(|i| format_ident!("S{i}"));
+        let mut generic_gen = (0usize..)
+            .into_iter()
+            .map(|i| str_to_type(&format!("S{i}")));
         let new_fn = transform_fn(old_fn, &mut generic_gen);
         // println!("{:#?}", new_fn);
         let new_code = item_fn_to_string(new_fn);
