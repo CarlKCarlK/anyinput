@@ -5,7 +5,7 @@
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::__private::TokenStream; // todo don't use private
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
@@ -143,15 +143,14 @@ fn transform_inputs(
 }
 
 // Define generics for each special input type. For example, 'S0 : AsRef<str>'
+#[allow(clippy::ptr_arg)]
 fn transform_generics(
     old_params: &Punctuated<GenericParam, Comma>,
     specials: &Vec<Special>,
 ) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
-    for new_type in specials {
-        let ty = &new_type.ty;
-        let new_param = parse_quote!(#ty : AsRef<str>);
-        new_params.push(new_param);
+    for new_type in specials.iter().map(|s| &s.ty) {
+        new_params.push(parse_quote!(#new_type : AsRef<str>));
     }
     new_params
 }
@@ -172,7 +171,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> 
 #[cfg(test)]
 mod tests {
     use prettyplease::unparse;
-    use quote::{format_ident, quote};
+    use quote::quote;
     use syn::{parse2, parse_str};
     use syn::{File, Item, ItemFn};
 
