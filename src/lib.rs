@@ -198,7 +198,7 @@ fn process_fn_arg(
         let delta2 = process_type(&*pat_type.ty, likes, generic_gen);
         if let Some(like) = delta2.like {
             let new_fn_arg = FnArg::Typed(PatType {
-                ty: Box::new(delta2.new_type_cmk.unwrap()), // cmk remove unwrap
+                ty: Box::new(delta2.new_type_cmk),
                 ..pat_type.clone()
             });
             let name = pat_ident.ident.clone(); // cmk too many clones
@@ -236,7 +236,7 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 }
 
 struct DeltaType {
-    new_type_cmk: Option<Type>,
+    new_type_cmk: Type,
     like: Option<Like>,
     generic_params: Vec<GenericParam>,
 }
@@ -264,7 +264,7 @@ fn process_type(
         if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
             // cmk always pass old and new, never None
             let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
-            sub_type = sub_delta2.new_type_cmk;
+            sub_type = Some(sub_delta2.new_type_cmk);
             generic_params = [generic_params, sub_delta2.generic_params].concat();
         } else {
             sub_type = None;
@@ -278,13 +278,13 @@ fn process_type(
 
         DeltaType {
             like: Some(like),
-            new_type_cmk: Some(new_type),
+            new_type_cmk: new_type,
             generic_params,
         }
     } else {
         DeltaType {
             like: None,
-            new_type_cmk: Some(ty.clone()),
+            new_type_cmk: ty.clone(),
             generic_params: vec![],
         }
     }
