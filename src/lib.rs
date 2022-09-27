@@ -167,10 +167,10 @@ fn transform_inputs(
     let mut stmts: Vec<Stmt> = vec![];
 
     for old_fn_arg in old_inputs {
-        let delta = process_fn_arg(old_fn_arg, &likes, generic_gen);
-        stmts = [stmts, delta.stmts].concat();
-        generic_params = [generic_params, delta.generic_params].concat();
-        new_fn_args.push(delta.fn_arg);
+        let delta_fn_arg = process_fn_arg(old_fn_arg, &likes, generic_gen);
+        stmts = [stmts, delta_fn_arg.stmts].concat();
+        generic_params = [generic_params, delta_fn_arg.generic_params].concat();
+        new_fn_args.push(delta_fn_arg.fn_arg);
         // see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
         // todo: Do these struct contains Box to make them easier to modify?
         // The box pattern syntax is experimental and can't use used in stable Rust.
@@ -198,7 +198,7 @@ fn process_fn_arg(
         let delta2 = process_type(&*pat_type.ty, likes, generic_gen);
         if let Some(like) = delta2.like {
             let new_fn_arg = FnArg::Typed(PatType {
-                ty: Box::new(delta2.new_type.unwrap()), // cmk remove unwrap
+                ty: Box::new(delta2.new_type_cmk.unwrap()), // cmk remove unwrap
                 ..pat_type.clone()
             });
             let name = pat_ident.ident.clone(); // cmk too many clones
@@ -236,7 +236,7 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 }
 
 struct DeltaType {
-    new_type: Option<Type>,
+    new_type_cmk: Option<Type>,
     like: Option<Like>,
     generic_params: Vec<GenericParam>,
 }
@@ -259,17 +259,21 @@ fn process_type(
         // if at the type-level, define the new stmt.
 
         // cmk rewrite this without the mut
-        let mut sub_type = has_sub_type(segment.arguments);
+        let sub_type: Option<Type>;
         let mut generic_params: Vec<GenericParam> = vec![];
-        if let Some(sub_type_inner) = &sub_type {
+        if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
             // println!("was {:#?}, now {:#?}", sub_type, sub_type_inner);
-            let sub_delta2 = process_type(sub_type_inner, likes, generic_gen);
+            let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
             // println!("sub_delta2.new_type {:#?}", &sub_delta2.new_type);
             // cmk always pass old and new, never None
-            if let Some(new_sub_type) = sub_delta2.new_type {
+            if let Some(new_sub_type) = sub_delta2.new_type_cmk {
                 sub_type = Some(new_sub_type);
+            } else {
+                sub_type = Some(sub_type_inner);
             }
             generic_params = [generic_params, sub_delta2.generic_params].concat();
+        } else {
+            sub_type = None;
         }
 
         let new_type = generic_gen.next().unwrap();
@@ -280,13 +284,13 @@ fn process_type(
 
         DeltaType {
             like: Some(like),
-            new_type: Some(new_type),
+            new_type_cmk: Some(new_type),
             generic_params,
         }
     } else {
         DeltaType {
             like: None,
-            new_type: None,
+            new_type_cmk: None,
             generic_params: vec![],
         }
     }
