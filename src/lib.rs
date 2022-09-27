@@ -465,4 +465,31 @@ mod tests {
         }
         assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
     }
+
+    #[test]
+    fn one_iter_t() {
+        let before = parse_quote! {
+        pub fn any_count_iter<T>(i: IterLike<T>) -> Result<usize, anyhow::Error> {
+            let count = i.count();
+            Ok(count)
+        }        };
+        let expected = parse_quote! {
+        pub fn any_count_iter<T, S0: IntoIterator<Item = T>>(i: S0) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter();
+            let count = i.count();
+            Ok(count)
+        }};
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_item_fn_eq(&after, &expected);
+
+        pub fn any_count_iter<T, S0: IntoIterator<Item = T>>(
+            i: S0,
+        ) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter();
+            let count = i.count();
+            Ok(count)
+        }
+        assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
+    }
 }
