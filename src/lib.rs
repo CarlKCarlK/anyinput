@@ -30,8 +30,7 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::Type>) -> ItemFn {
-    fn string_1(special: &Special) -> GenericParam {
-        let new_type = &special.ty;
+    fn string_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
         parse_quote!(#new_type : AsRef<str>)
     }
     fn string_2(name: Ident) -> Stmt {
@@ -39,8 +38,7 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
             let #name = #name.as_ref();
         }
     }
-    fn path_1(special: &Special) -> GenericParam {
-        let new_type = &special.ty;
+    fn path_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
         parse_quote!(#new_type : AsRef<Path>)
     }
     fn path_2(name: Ident) -> Stmt {
@@ -49,10 +47,8 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
         }
     }
 
-    fn iter_1(special: &Special) -> GenericParam {
-        let new_type = &special.ty;
-        let sub_types = &special.sub_types;
-        let sub_type = &sub_types[0]; // cmks
+    fn iter_1(new_type: &Type, sub_type: Option<&Type>) -> GenericParam {
+        let sub_type = sub_type.expect("iter_1: sub_type");
         parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
     }
     fn iter_2(name: Ident) -> Stmt {
@@ -204,19 +200,13 @@ fn transform_inputs(
                         ..pat_type.clone()
                     }));
 
-                    let special = Special {
-                        name: pat_ident.ident.clone(),
-                        ty: new_type,
-                        sub_types,
-                        like,
-                    };
+                    let name = pat_ident.ident.clone();
+                    let sub_type = first_and_only(sub_types.iter());
 
                     // cmk why does the type_to_gp function need a move input?
-                    generic_params.push((special.like.like_to_generic_param)(&special));
+                    generic_params.push((&like.like_to_generic_param)(&new_type, sub_type));
 
-                    let name = special.name.clone();
-                    let new_stmt = (special.like.ident_to_stmt)(name);
-                    stmts.push(new_stmt);
+                    stmts.push((&like.ident_to_stmt)(name));
                 }
             }
         }
@@ -299,7 +289,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
 #[derive(Clone)]
 struct Like {
     special: Ident,
-    like_to_generic_param: &'static dyn Fn(&Special) -> GenericParam,
+    like_to_generic_param: &'static dyn Fn(&Type, Option<&Type>) -> GenericParam,
     ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
 
