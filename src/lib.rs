@@ -8,13 +8,13 @@
 // cmk what about Vec<StringLike>?
 
 use quote::quote;
-use syn::PathSegment;
 use syn::__private::TokenStream; // todo don't use private
 use syn::{
     parse_macro_input, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
     GenericArgument, GenericParam, Generics, Ident, ItemFn, Pat, PatType, PathArguments, Signature,
     Stmt, Type, Type::Path,
 };
+use syn::{PatIdent, PathSegment};
 use uuid::Uuid;
 
 // #[proc_macro_attribute]
@@ -167,45 +167,49 @@ fn transform_inputs(
     let mut stmts: Vec<Stmt> = vec![];
 
     for old_fn_arg in old_inputs {
-        let mut found_special = false; // todo think of other ways to control the flow
-
         // If the input is 'Typed' (so not self), and
         // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
         // the type is 'Path' (so not, for example, a macro), and
-        // the one and only item in path is, for example, 'StringLike'
-        // then replace the type with a generic type.
-        //
+        if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
+            // the one and only item in path is, for example, 'StringLike'
+            // then replace the type with a generic type.
+            if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
+                let sub_types = process_special(segment, &likes);
+
+                let new_type = generic_gen.next().unwrap();
+                new_fn_args.push(FnArg::Typed(PatType {
+                    ty: Box::new(new_type.clone()),
+                    ..pat_type.clone()
+                }));
+
+                // cmk why does the type_to_gp function need a move input?
+                let sub_type = first_and_only(sub_types.iter());
+                generic_params.push((like.like_to_generic_param)(&new_type, sub_type));
+
+                let name = pat_ident.ident.clone(); // cmk too many clones
+                stmts.push((like.ident_to_stmt)(name));
+            } else {
+                new_fn_args.push(old_fn_arg.clone());
+            }
+        } else {
+            new_fn_args.push(old_fn_arg.clone());
+        }
         // see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
         // todo: Do these struct contains Box to make them easier to modify?
         // The box pattern syntax is experimental and can't use used in stable Rust.
-
-        if let FnArg::Typed(pat_type) = old_fn_arg {
-            if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
-                    found_special = true;
-
-                    let sub_types = process_special(segment, &likes);
-
-                    let new_type = generic_gen.next().unwrap();
-                    new_fn_args.push(FnArg::Typed(PatType {
-                        ty: Box::new(new_type.clone()),
-                        ..pat_type.clone()
-                    }));
-
-                    // cmk why does the type_to_gp function need a move input?
-                    let sub_type = first_and_only(sub_types.iter());
-                    generic_params.push((like.like_to_generic_param)(&new_type, sub_type));
-
-                    let name = pat_ident.ident.clone(); // cmk too many clones
-                    stmts.push((like.ident_to_stmt)(name));
-                }
-            }
-        }
-        if !found_special {
-            new_fn_args.push(old_fn_arg.clone());
-        }
     }
     (new_fn_args, generic_params, stmts)
+}
+
+fn is_normal(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
+    if let FnArg::Typed(pat_type) = arg {
+        if let Pat::Ident(pat_ident) = &*pat_type.pat {
+            if let Type::Path(_) = &*pat_type.ty {
+                return Some((pat_ident, pat_type));
+            }
+        }
+    }
+    None
 }
 
 fn process_special(segment: PathSegment, likes: &Vec<Like>) -> Vec<Type> {
