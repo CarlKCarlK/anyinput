@@ -82,14 +82,14 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
     ];
 
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
-    let (new_inputs, specials, generic_params) =
+    let (new_inputs, generic_params, stmts) =
         transform_inputs(&old_fn.sig.inputs, generic_gen, likes);
 
     // For each special input found, define a new generic, for example, 'S0 : AsRef<str>'
     let new_generics = transform_generics(&old_fn.sig.generics.params, generic_params);
 
     // For each special input found, add a statement defining a new local variable. For example, 'let s = s.as_ref();'
-    let new_stmts = transform_stmts(&old_fn.block.stmts, &specials);
+    let new_stmts = transform_stmts(&old_fn.block.stmts, stmts);
 
     // Create a new function with the transformed inputs, generics, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
@@ -171,12 +171,12 @@ fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = Type>,
     likes: Vec<Like>,
-) -> (Punctuated<FnArg, Comma>, Vec<Special>, Vec<GenericParam>) {
+) -> (Punctuated<FnArg, Comma>, Vec<GenericParam>, Vec<Stmt>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
     // Remember the names and types of the special inputs.
-    let mut specials: Vec<Special> = vec![];
     let mut generic_params: Vec<GenericParam> = vec![];
+    let mut stmts: Vec<Stmt> = vec![];
 
     for old_fn_arg in old_inputs {
         let mut found_special = false; // todo think of other ways to control the flow
@@ -210,10 +210,13 @@ fn transform_inputs(
                         sub_types,
                         like,
                     };
-                    specials.push(special.clone());
 
                     // cmk why does the type_to_gp function need a move input?
                     generic_params.push((special.like.like_to_generic_param)(&special));
+
+                    let name = special.name.clone();
+                    let new_stmt = (special.like.ident_to_stmt)(name);
+                    stmts.push(new_stmt);
                 }
             }
         }
@@ -221,7 +224,7 @@ fn transform_inputs(
             new_fn_args.push(old_fn_arg.clone());
         }
     }
-    (new_fn_args, specials, generic_params)
+    (new_fn_args, generic_params, stmts)
 }
 
 fn process_special(segment: PathSegment, likes: &Vec<Like>) -> Vec<Type> {
@@ -285,12 +288,10 @@ fn transform_generics(
 
 // For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
 #[allow(clippy::ptr_arg)]
-fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> {
+fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
     let mut new_stmts = old_stmts.clone();
-    for (index, special) in specials.iter().enumerate() {
-        let name = special.name.clone();
-        let new_stmt = (special.like.ident_to_stmt)(name);
-        new_stmts.insert(index, new_stmt);
+    for (index, new_stmt) in stmts.iter().enumerate() {
+        new_stmts.insert(index, new_stmt.clone()); // cmk too much cloning
     }
     new_stmts
 }
