@@ -182,15 +182,19 @@ fn transform_inputs(
                 if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
                     found_special = true;
 
-                    process_special(
-                        segment,
-                        generic_gen,
-                        &mut new_fn_args,
-                        pat_type,
-                        &mut specials,
-                        pat_ident,
+                    let sub_type = process_special(segment);
+
+                    let new_type = generic_gen.next().unwrap();
+                    new_fn_args.push(FnArg::Typed(PatType {
+                        ty: Box::new(new_type.clone()),
+                        ..pat_type.clone()
+                    }));
+                    specials.push(Special {
+                        name: pat_ident.ident.clone(),
+                        ty: new_type,
+                        sub_type,
                         like,
-                    );
+                    });
                 }
             }
         }
@@ -201,15 +205,7 @@ fn transform_inputs(
     (new_fn_args, specials)
 }
 
-fn process_special(
-    segment: PathSegment,
-    generic_gen: &mut impl Iterator<Item = Type>,
-    new_fn_args: &mut Punctuated<FnArg, Comma>,
-    pat_type: &PatType,
-    specials: &mut Vec<Special>,
-    pat_ident: &syn::PatIdent,
-    like: Like,
-) {
+fn process_special(segment: PathSegment) -> Option<Type> {
     let sub_type: Option<Type>;
     match segment.arguments {
         PathArguments::None => {
@@ -232,17 +228,7 @@ fn process_special(
             panic!("Parenthesized not supported")
         }
     };
-    let new_type = generic_gen.next().unwrap();
-    new_fn_args.push(FnArg::Typed(PatType {
-        ty: Box::new(new_type.clone()),
-        ..pat_type.clone()
-    }));
-    specials.push(Special {
-        name: pat_ident.ident.clone(),
-        ty: new_type,
-        sub_type,
-        like,
-    });
+    sub_type
 }
 
 // cmk rename
