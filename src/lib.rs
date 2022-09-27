@@ -173,24 +173,16 @@ fn transform_inputs(
         if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
             // the one and only item in path is, for example, 'StringLike'
             // then replace the type with a generic type.
-            if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
-                let sub_types = process_special(segment, &likes);
-
-                let new_type = generic_gen.next().unwrap();
-                new_fn_args.push(FnArg::Typed(PatType {
-                    ty: Box::new(new_type.clone()),
-                    ..pat_type.clone()
-                }));
-
-                // cmk why does the type_to_gp function need a move input?
-                let sub_type = first_and_only(sub_types.iter());
-                generic_params.push((like.like_to_generic_param)(&new_type, sub_type));
-
-                let name = pat_ident.ident.clone(); // cmk too many clones
-                stmts.push((like.ident_to_stmt)(name));
-            } else {
-                new_fn_args.push(old_fn_arg.clone());
-            }
+            process_normal(
+                pat_type,
+                &likes,
+                generic_gen,
+                &mut new_fn_args,
+                &mut generic_params,
+                pat_ident,
+                &mut stmts,
+                old_fn_arg,
+            );
         } else {
             new_fn_args.push(old_fn_arg.clone());
         }
@@ -199,6 +191,36 @@ fn transform_inputs(
         // The box pattern syntax is experimental and can't use used in stable Rust.
     }
     (new_fn_args, generic_params, stmts)
+}
+
+fn process_normal(
+    pat_type: &PatType,
+    likes: &Vec<Like>,
+    generic_gen: &mut impl Iterator<Item = Type>,
+    new_fn_args: &mut Punctuated<FnArg, Comma>,
+    generic_params: &mut Vec<GenericParam>,
+    pat_ident: &PatIdent,
+    stmts: &mut Vec<Stmt>,
+    old_fn_arg: &FnArg,
+) {
+    if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
+        let sub_types = process_special(segment, likes);
+
+        let new_type = generic_gen.next().unwrap();
+        new_fn_args.push(FnArg::Typed(PatType {
+            ty: Box::new(new_type.clone()),
+            ..pat_type.clone()
+        }));
+
+        // cmk why does the type_to_gp function need a move input?
+        let sub_type = first_and_only(sub_types.iter());
+        generic_params.push((like.like_to_generic_param)(&new_type, sub_type));
+
+        let name = pat_ident.ident.clone(); // cmk too many clones
+        stmts.push((like.ident_to_stmt)(name));
+    } else {
+        new_fn_args.push(old_fn_arg.clone());
+    }
 }
 
 fn is_normal(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
