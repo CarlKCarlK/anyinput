@@ -168,10 +168,9 @@ fn transform_inputs(
 
     for old_fn_arg in old_inputs {
         let delta = process_fn_arg(old_fn_arg, &likes, generic_gen);
-
-        new_fn_args.push(delta.fn_arg);
         stmts = [stmts, delta.stmts].concat();
         generic_params = [generic_params, delta.generic_params].concat();
+        new_fn_args.push(delta.fn_arg);
         // see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
         // todo: Do these struct contains Box to make them easier to modify?
         // The box pattern syntax is experimental and can't use used in stable Rust.
@@ -179,25 +178,50 @@ fn transform_inputs(
     (new_fn_args, generic_params, stmts)
 }
 
-struct Delta {
+struct Delta1 {
     fn_arg: FnArg,
     generic_params: Vec<GenericParam>,
     stmts: Vec<Stmt>,
+}
+
+struct Delta2 {
+    new_type: Option<Type>,
+    like: Option<Like>,
+    generic_params: Vec<GenericParam>,
 }
 
 fn process_fn_arg(
     old_fn_arg: &FnArg,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
-) -> Delta {
+) -> Delta1 {
     // If the input is 'Typed' (so not self), and
     // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
     // the type is 'Path' (so not, for example, a macro), and
     if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        process_special(pat_type, likes, generic_gen, pat_ident, old_fn_arg)
+        let delta2 = process_special(pat_type, likes, generic_gen);
+        if let Some(like) = delta2.like {
+            let new_fn_arg = FnArg::Typed(PatType {
+                ty: Box::new(delta2.new_type.unwrap().clone()), // cmk remove unwrap
+                ..pat_type.clone()
+            });
+            let name = pat_ident.ident.clone(); // cmk too many clones
+            let stmts = vec![(like.ident_to_stmt)(name)];
+            Delta1 {
+                fn_arg: new_fn_arg,
+                generic_params: delta2.generic_params,
+                stmts,
+            }
+        } else {
+            Delta1 {
+                fn_arg: old_fn_arg.clone(),
+                generic_params: vec![],
+                stmts: vec![],
+            }
+        }
     } else {
-        Delta {
+        Delta1 {
             fn_arg: old_fn_arg.clone(),
             generic_params: vec![],
             stmts: vec![],
@@ -209,9 +233,7 @@ fn process_special(
     pat_type: &PatType,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
-    pat_ident: &PatIdent,
-    old_fn_arg: &FnArg,
-) -> Delta {
+) -> Delta2 {
     if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
         // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
         // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
@@ -260,27 +282,20 @@ fn process_special(
         // };
 
         let new_type = generic_gen.next().unwrap();
-        let new_fn_arg = FnArg::Typed(PatType {
-            ty: Box::new(new_type.clone()),
-            ..pat_type.clone()
-        });
 
         // cmk why does the like_to_generic_param function need a move input?
         let generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
 
-        let name = pat_ident.ident.clone(); // cmk too many clones
-        let stmts = vec![(like.ident_to_stmt)(name)];
-
-        Delta {
-            fn_arg: new_fn_arg,
+        Delta2 {
+            like: Some(like),
+            new_type: Some(new_type),
             generic_params,
-            stmts,
         }
     } else {
-        Delta {
-            fn_arg: old_fn_arg.clone(),
+        Delta2 {
+            like: None,
+            new_type: None,
             generic_params: vec![],
-            stmts: vec![],
         }
     }
 }
