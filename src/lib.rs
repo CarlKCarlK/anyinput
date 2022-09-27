@@ -245,10 +245,17 @@ fn process_special(
         //      process something, returning the perhaps new subtype (any maybe new generics),
         // define our own generic type, S0, and add it to the list of generics
         // if at the type-level, define the new stmt.
-        let sub_type = has_sub_type(segment.arguments);
+
+        // cmk rewrite this without the mut
+        let mut sub_type = has_sub_type(segment.arguments);
+        let mut generic_params: Vec<GenericParam> = vec![];
         if let Some(sub_type_inner) = &sub_type {
             let sub_delta2 = process_special(sub_type_inner, likes, generic_gen);
-            // Look for special
+            // cmk always pass old and new, never None
+            if let Some(new_sub_type) = sub_delta2.new_type {
+                sub_type = Some(new_sub_type);
+            }
+            generic_params = [generic_params, sub_delta2.generic_params].concat();
         }
 
         // // then replace the type with a generic type.
@@ -285,7 +292,8 @@ fn process_special(
         let new_type = generic_gen.next().unwrap();
 
         // cmk why does the like_to_generic_param function need a move input?
-        let generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
+        let generic_params_0 = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
+        let generic_params = [generic_params, generic_params_0].concat();
 
         Delta2 {
             like: Some(like),
