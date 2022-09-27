@@ -196,8 +196,51 @@ fn process_fn_arg(
     if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
         if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
-            // then replace the type with a generic type.
-            let sub_types = process_special(segment, likes);
+            // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
+            // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+            // v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
+            // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+            // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
+
+            // If Like<something> is found,
+            //      process something, returning the perhaps new subtype (any maybe new generics),
+            // define our own generic type, S0, and add it to the list of generics
+            // if at the type-level, define the new stmt.
+            let sub_type = has_sub_type(segment.arguments);
+            if let Some(sub_type_inner) = &sub_type {
+                // Look for special
+            }
+
+            // // then replace the type with a generic type.
+            // let sub_types = {
+            //     let sub_types;
+            //     match segment.arguments {
+            //         PathArguments::None => {
+            //             sub_types = vec![];
+            //         }
+            //         PathArguments::AngleBracketed(ref args) => {
+            //             let arg =
+            //                 first_and_only(args.args.iter()).expect("expected one argument cmk");
+            //             print!("arg: {:#?}", arg);
+            //             if let GenericArgument::Type(sub_type2) = arg {
+            //                 // cmk IterLike<PathLike>
+
+            //                 if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
+            //                     let sub_types2 = process_special(segment2, likes);
+            //                     sub_types = sub_types2;
+            //                 } else {
+            //                     sub_types = vec![sub_type2.clone()];
+            //                 }
+            //             } else {
+            //                 panic!("expected GenericArgument::Type cmk");
+            //             }
+            //         }
+            //         PathArguments::Parenthesized(_) => {
+            //             panic!("Parenthesized not supported")
+            //         }
+            //     };
+            //     sub_types
+            // };
 
             let new_type = generic_gen.next().unwrap();
             let new_fn_arg = FnArg::Typed(PatType {
@@ -205,9 +248,8 @@ fn process_fn_arg(
                 ..pat_type.clone()
             });
 
-            let sub_type = first_and_only(sub_types.iter());
             // cmk why does the like_to_generic_param function need a move input?
-            let generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type)];
+            let generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
 
             let name = pat_ident.ident.clone(); // cmk too many clones
             let stmts = vec![(like.ident_to_stmt)(name)];
@@ -233,6 +275,24 @@ fn process_fn_arg(
     }
 }
 
+fn has_sub_type(args: PathArguments) -> Option<Type> {
+    match args {
+        PathArguments::None => None,
+        PathArguments::AngleBracketed(ref args) => {
+            let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
+            print!("arg: {:#?}", arg);
+            if let GenericArgument::Type(sub_type2) = arg {
+                // cmk IterLike<PathLike>
+                Some(sub_type2.clone())
+            } else {
+                panic!("expected GenericArgument::Type cmk");
+            }
+        }
+        PathArguments::Parenthesized(_) => {
+            panic!("Parenthesized not supported")
+        }
+    }
+}
 fn is_normal(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
     if let FnArg::Typed(pat_type) = arg {
         if let Pat::Ident(pat_ident) = &*pat_type.pat {
@@ -244,34 +304,34 @@ fn is_normal(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
     None
 }
 
-fn process_special(segment: PathSegment, likes: &Vec<Like>) -> Vec<Type> {
-    let sub_types;
-    match segment.arguments {
-        PathArguments::None => {
-            sub_types = vec![];
-        }
-        PathArguments::AngleBracketed(ref args) => {
-            let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
-            print!("arg: {:#?}", arg);
-            if let GenericArgument::Type(sub_type2) = arg {
-                // cmk IterLike<PathLike>
+// fn process_special(segment: PathSegment, likes: &Vec<Like>) -> Vec<Type> {
+//     let sub_types;
+//     match segment.arguments {
+//         PathArguments::None => {
+//             sub_types = vec![];
+//         }
+//         PathArguments::AngleBracketed(ref args) => {
+//             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
+//             print!("arg: {:#?}", arg);
+//             if let GenericArgument::Type(sub_type2) = arg {
+//                 // cmk IterLike<PathLike>
 
-                if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
-                    let sub_types2 = process_special(segment2, likes);
-                    sub_types = sub_types2;
-                } else {
-                    sub_types = vec![sub_type2.clone()];
-                }
-            } else {
-                panic!("expected GenericArgument::Type cmk");
-            }
-        }
-        PathArguments::Parenthesized(_) => {
-            panic!("Parenthesized not supported")
-        }
-    };
-    sub_types
-}
+//                 if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
+//                     let sub_types2 = process_special(segment2, likes);
+//                     sub_types = sub_types2;
+//                 } else {
+//                     sub_types = vec![sub_type2.clone()];
+//                 }
+//             } else {
+//                 panic!("expected GenericArgument::Type cmk");
+//             }
+//         }
+//         PathArguments::Parenthesized(_) => {
+//             panic!("Parenthesized not supported")
+//         }
+//     };
+//     sub_types
+// }
 
 // cmk rename
 fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
