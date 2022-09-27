@@ -262,15 +262,9 @@ fn process_type(
         let sub_type: Option<Type>;
         let mut generic_params: Vec<GenericParam> = vec![];
         if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
-            // println!("was {:#?}, now {:#?}", sub_type, sub_type_inner);
-            let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
-            // println!("sub_delta2.new_type {:#?}", &sub_delta2.new_type);
             // cmk always pass old and new, never None
-            if let Some(new_sub_type) = sub_delta2.new_type_cmk {
-                sub_type = Some(new_sub_type);
-            } else {
-                sub_type = Some(sub_type_inner);
-            }
+            let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
+            sub_type = sub_delta2.new_type_cmk;
             generic_params = [generic_params, sub_delta2.generic_params].concat();
         } else {
             sub_type = None;
@@ -290,7 +284,7 @@ fn process_type(
     } else {
         DeltaType {
             like: None,
-            new_type_cmk: None,
+            new_type_cmk: Some(ty.clone()),
             generic_params: vec![],
         }
     }
