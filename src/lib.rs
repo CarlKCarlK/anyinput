@@ -179,29 +179,23 @@ fn transform_inputs(
 }
 
 #[derive(Debug)]
-struct Delta1 {
+struct DeltaFnArg {
     fn_arg: FnArg,
     generic_params: Vec<GenericParam>,
     stmts: Vec<Stmt>,
-}
-
-struct Delta2 {
-    new_type: Option<Type>,
-    like: Option<Like>,
-    generic_params: Vec<GenericParam>,
 }
 
 fn process_fn_arg(
     old_fn_arg: &FnArg,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
-) -> Delta1 {
+) -> DeltaFnArg {
     // If the input is 'Typed' (so not self), and
     // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
     // the type is 'Path' (so not, for example, a macro), and
-    if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
+    if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        let delta2 = process_special(&*pat_type.ty, likes, generic_gen);
+        let delta2 = process_type(&*pat_type.ty, likes, generic_gen);
         if let Some(like) = delta2.like {
             let new_fn_arg = FnArg::Typed(PatType {
                 ty: Box::new(delta2.new_type.unwrap()), // cmk remove unwrap
@@ -209,20 +203,20 @@ fn process_fn_arg(
             });
             let name = pat_ident.ident.clone(); // cmk too many clones
             let stmts = vec![(like.ident_to_stmt)(name)];
-            Delta1 {
+            DeltaFnArg {
                 fn_arg: new_fn_arg,
                 generic_params: delta2.generic_params,
                 stmts,
             }
         } else {
-            Delta1 {
+            DeltaFnArg {
                 fn_arg: old_fn_arg.clone(),
                 generic_params: vec![],
                 stmts: vec![],
             }
         }
     } else {
-        Delta1 {
+        DeltaFnArg {
             fn_arg: old_fn_arg.clone(),
             generic_params: vec![],
             stmts: vec![],
@@ -230,11 +224,28 @@ fn process_fn_arg(
     }
 }
 
-fn process_special(
+fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
+    if let FnArg::Typed(pat_type) = arg {
+        if let Pat::Ident(pat_ident) = &*pat_type.pat {
+            if let Type::Path(_) = &*pat_type.ty {
+                return Some((pat_ident, pat_type));
+            }
+        }
+    }
+    None
+}
+
+struct DeltaType {
+    new_type: Option<Type>,
+    like: Option<Like>,
+    generic_params: Vec<GenericParam>,
+}
+
+fn process_type(
     ty: &Type,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
-) -> Delta2 {
+) -> DeltaType {
     if let Some((segment, like)) = is_special_type(ty, likes) {
         // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
         // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
@@ -252,7 +263,7 @@ fn process_special(
         let mut generic_params: Vec<GenericParam> = vec![];
         if let Some(sub_type_inner) = &sub_type {
             // println!("was {:#?}, now {:#?}", sub_type, sub_type_inner);
-            let sub_delta2 = process_special(sub_type_inner, likes, generic_gen);
+            let sub_delta2 = process_type(sub_type_inner, likes, generic_gen);
             // println!("sub_delta2.new_type {:#?}", &sub_delta2.new_type);
             // cmk always pass old and new, never None
             if let Some(new_sub_type) = sub_delta2.new_type {
@@ -261,50 +272,19 @@ fn process_special(
             generic_params = [generic_params, sub_delta2.generic_params].concat();
         }
 
-        // // then replace the type with a generic type.
-        // let sub_types = {
-        //     let sub_types;
-        //     match segment.arguments {
-        //         PathArguments::None => {
-        //             sub_types = vec![];
-        //         }
-        //         PathArguments::AngleBracketed(ref args) => {
-        //             let arg =
-        //                 first_and_only(args.args.iter()).expect("expected one argument cmk");
-        //             print!("arg: {:#?}", arg);
-        //             if let GenericArgument::Type(sub_type2) = arg {
-        //                 // cmk IterLike<PathLike>
-
-        //                 if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
-        //                     let sub_types2 = process_special(segment2, likes);
-        //                     sub_types = sub_types2;
-        //                 } else {
-        //                     sub_types = vec![sub_type2.clone()];
-        //                 }
-        //             } else {
-        //                 panic!("expected GenericArgument::Type cmk");
-        //             }
-        //         }
-        //         PathArguments::Parenthesized(_) => {
-        //             panic!("Parenthesized not supported")
-        //         }
-        //     };
-        //     sub_types
-        // };
-
         let new_type = generic_gen.next().unwrap();
 
         // cmk why does the like_to_generic_param function need a move input?
         let generic_params_0 = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
         let generic_params = [generic_params, generic_params_0].concat();
 
-        Delta2 {
+        DeltaType {
             like: Some(like),
             new_type: Some(new_type),
             generic_params,
         }
     } else {
-        Delta2 {
+        DeltaType {
             like: None,
             new_type: None,
             generic_params: vec![],
@@ -330,47 +310,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
         }
     }
 }
-fn is_normal(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
-    if let FnArg::Typed(pat_type) = arg {
-        if let Pat::Ident(pat_ident) = &*pat_type.pat {
-            if let Type::Path(_) = &*pat_type.ty {
-                return Some((pat_ident, pat_type));
-            }
-        }
-    }
-    None
-}
 
-// fn process_special(segment: PathSegment, likes: &Vec<Like>) -> Vec<Type> {
-//     let sub_types;
-//     match segment.arguments {
-//         PathArguments::None => {
-//             sub_types = vec![];
-//         }
-//         PathArguments::AngleBracketed(ref args) => {
-//             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
-//             print!("arg: {:#?}", arg);
-//             if let GenericArgument::Type(sub_type2) = arg {
-//                 // cmk IterLike<PathLike>
-
-//                 if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
-//                     let sub_types2 = process_special(segment2, likes);
-//                     sub_types = sub_types2;
-//                 } else {
-//                     sub_types = vec![sub_type2.clone()];
-//                 }
-//             } else {
-//                 panic!("expected GenericArgument::Type cmk");
-//             }
-//         }
-//         PathArguments::Parenthesized(_) => {
-//             panic!("Parenthesized not supported")
-//         }
-//     };
-//     sub_types
-// }
-
-// cmk rename
 fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
     if let Path(type_path) = ty {
         // print!("type_path: {:#?}", type_path);
@@ -387,6 +327,7 @@ fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> 
     }
     None
 }
+
 // Define generics for each special input type. For example, 'S0 : AsRef<str>'
 #[allow(clippy::ptr_arg)]
 fn transform_generics(
@@ -463,7 +404,7 @@ mod tests {
         let mut uuid_generator = UuidGenerator::new();
         for i in 0..10 {
             let _ = uuid_generator.next();
-            // println!("{:#?}", i);
+            println!("{:#?}", i);
         }
     }
 
@@ -672,5 +613,34 @@ mod tests {
             Ok(sum_count)
         }
         assert_eq!(any_count_iter(["a/b", "d"]).unwrap(), 3);
+    }
+
+    #[test]
+    fn one_vec_path() {
+        let before = parse_quote! {
+        pub fn any_count_vec(
+            i: Vec<PathLike>,
+        ) -> Result<usize, anyhow::Error> {
+            let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
+            Ok(sum_count)
+        }};
+        let expected = parse_quote! {
+        pub fn any_count_vec<S0: AsRef<std::path::Path>>(
+            i: Vec<S0>,
+        ) -> Result<usize, anyhow::Error> {
+            let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
+            Ok(sum_count)
+        }};
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_item_fn_eq(&after, &expected);
+
+        pub fn any_count_vec<S0: AsRef<std::path::Path>>(
+            i: Vec<S0>,
+        ) -> Result<usize, anyhow::Error> {
+            let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
+            Ok(sum_count)
+        }
+        assert_eq!(any_count_vec(vec!["a/b", "d"]).unwrap(), 3);
     }
 }
