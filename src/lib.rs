@@ -167,10 +167,6 @@ fn transform_inputs(
     let mut stmts: Vec<Stmt> = vec![];
 
     for old_fn_arg in old_inputs {
-        // If the input is 'Typed' (so not self), and
-        // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
-        // the type is 'Path' (so not, for example, a macro), and
-
         let delta = process_fn_arg(old_fn_arg, &likes, generic_gen);
 
         new_fn_args.push(delta.fn_arg);
@@ -194,29 +190,27 @@ fn process_fn_arg(
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
 ) -> Delta {
+    // If the input is 'Typed' (so not self), and
+    // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
+    // the type is 'Path' (so not, for example, a macro), and
     if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        // then replace the type with a generic type.
-
         if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
-            let new_fn_arg: FnArg;
-            let generic_params: Vec<GenericParam>;
-            let stmts: Vec<Stmt>;
-
+            // then replace the type with a generic type.
             let sub_types = process_special(segment, likes);
 
             let new_type = generic_gen.next().unwrap();
-            new_fn_arg = FnArg::Typed(PatType {
+            let new_fn_arg = FnArg::Typed(PatType {
                 ty: Box::new(new_type.clone()),
                 ..pat_type.clone()
             });
 
-            // cmk why does the type_to_gp function need a move input?
             let sub_type = first_and_only(sub_types.iter());
-            generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type)];
+            // cmk why does the like_to_generic_param function need a move input?
+            let generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type)];
 
             let name = pat_ident.ident.clone(); // cmk too many clones
-            stmts = vec![(like.ident_to_stmt)(name)];
+            let stmts = vec![(like.ident_to_stmt)(name)];
 
             Delta {
                 fn_arg: new_fn_arg,
