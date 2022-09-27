@@ -171,18 +171,7 @@ fn transform_inputs(
         // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
         // the type is 'Path' (so not, for example, a macro), and
 
-        let delta: Delta;
-        if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
-            // the one and only item in path is, for example, 'StringLike'
-            // then replace the type with a generic type.
-            delta = process_normal(pat_ident, pat_type, old_fn_arg, &likes, generic_gen);
-        } else {
-            delta = Delta {
-                fn_arg: old_fn_arg.clone(),
-                generic_params: vec![],
-                stmts: vec![],
-            };
-        }
+        let delta = process_normal(old_fn_arg, &likes, generic_gen);
 
         new_fn_args.push(delta.fn_arg);
         stmts = [stmts, delta.stmts].concat();
@@ -201,41 +190,50 @@ struct Delta {
 }
 
 fn process_normal(
-    pat_ident: &PatIdent,
-    pat_type: &PatType,
     old_fn_arg: &FnArg,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
 ) -> Delta {
-    let new_fn_arg: FnArg;
-    let generic_params: Vec<GenericParam>;
-    let stmts: Vec<Stmt>;
+    if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
+        // the one and only item in path is, for example, 'StringLike'
+        // then replace the type with a generic type.
 
-    if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
-        let sub_types = process_special(segment, likes);
+        let new_fn_arg: FnArg;
+        let generic_params: Vec<GenericParam>;
+        let stmts: Vec<Stmt>;
 
-        let new_type = generic_gen.next().unwrap();
-        new_fn_arg = FnArg::Typed(PatType {
-            ty: Box::new(new_type.clone()),
-            ..pat_type.clone()
-        });
+        if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
+            let sub_types = process_special(segment, likes);
 
-        // cmk why does the type_to_gp function need a move input?
-        let sub_type = first_and_only(sub_types.iter());
-        generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type)];
+            let new_type = generic_gen.next().unwrap();
+            new_fn_arg = FnArg::Typed(PatType {
+                ty: Box::new(new_type.clone()),
+                ..pat_type.clone()
+            });
 
-        let name = pat_ident.ident.clone(); // cmk too many clones
-        stmts = vec![(like.ident_to_stmt)(name)];
+            // cmk why does the type_to_gp function need a move input?
+            let sub_type = first_and_only(sub_types.iter());
+            generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type)];
+
+            let name = pat_ident.ident.clone(); // cmk too many clones
+            stmts = vec![(like.ident_to_stmt)(name)];
+        } else {
+            new_fn_arg = old_fn_arg.clone();
+            generic_params = vec![];
+            stmts = vec![];
+        }
+
+        Delta {
+            fn_arg: new_fn_arg,
+            generic_params,
+            stmts,
+        }
     } else {
-        new_fn_arg = old_fn_arg.clone();
-        generic_params = vec![];
-        stmts = vec![];
-    }
-
-    Delta {
-        fn_arg: new_fn_arg,
-        generic_params,
-        stmts,
+        Delta {
+            fn_arg: old_fn_arg.clone(),
+            generic_params: vec![],
+            stmts: vec![],
+        }
     }
 }
 
