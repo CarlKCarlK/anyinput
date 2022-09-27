@@ -402,5 +402,14 @@ mod tests {
 
         let after = transform_fn(before, &mut generic_gen_test_factory());
         assert_item_fn_eq(&after, &expected);
+
+        pub fn any_count_iter<S0: IntoIterator<Item = usize>>(
+            i: S0,
+        ) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter();
+            let count = i.count();
+            Ok(count)
+        }
+        assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
     }
 }
