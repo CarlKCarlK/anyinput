@@ -195,76 +195,86 @@ fn process_fn_arg(
     // the type is 'Path' (so not, for example, a macro), and
     if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
-            // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
-            // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-            // v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
-            // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-            // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
+        process_special(pat_type, likes, generic_gen, pat_ident, old_fn_arg)
+    } else {
+        Delta {
+            fn_arg: old_fn_arg.clone(),
+            generic_params: vec![],
+            stmts: vec![],
+        }
+    }
+}
 
-            // If Like<something> is found,
-            //      process something, returning the perhaps new subtype (any maybe new generics),
-            // define our own generic type, S0, and add it to the list of generics
-            // if at the type-level, define the new stmt.
-            let sub_type = has_sub_type(segment.arguments);
-            if let Some(sub_type_inner) = &sub_type {
-                // Look for special
-            }
+fn process_special(
+    pat_type: &PatType,
+    likes: &Vec<Like>,
+    generic_gen: &mut impl Iterator<Item = Type>,
+    pat_ident: &PatIdent,
+    old_fn_arg: &FnArg,
+) -> Delta {
+    if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
+        // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
+        // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+        // v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
+        // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+        // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
 
-            // // then replace the type with a generic type.
-            // let sub_types = {
-            //     let sub_types;
-            //     match segment.arguments {
-            //         PathArguments::None => {
-            //             sub_types = vec![];
-            //         }
-            //         PathArguments::AngleBracketed(ref args) => {
-            //             let arg =
-            //                 first_and_only(args.args.iter()).expect("expected one argument cmk");
-            //             print!("arg: {:#?}", arg);
-            //             if let GenericArgument::Type(sub_type2) = arg {
-            //                 // cmk IterLike<PathLike>
+        // If Like<something> is found,
+        //      process something, returning the perhaps new subtype (any maybe new generics),
+        // define our own generic type, S0, and add it to the list of generics
+        // if at the type-level, define the new stmt.
+        let sub_type = has_sub_type(segment.arguments);
+        if let Some(sub_type_inner) = &sub_type {
+            // Look for special
+        }
 
-            //                 if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
-            //                     let sub_types2 = process_special(segment2, likes);
-            //                     sub_types = sub_types2;
-            //                 } else {
-            //                     sub_types = vec![sub_type2.clone()];
-            //                 }
-            //             } else {
-            //                 panic!("expected GenericArgument::Type cmk");
-            //             }
-            //         }
-            //         PathArguments::Parenthesized(_) => {
-            //             panic!("Parenthesized not supported")
-            //         }
-            //     };
-            //     sub_types
-            // };
+        // // then replace the type with a generic type.
+        // let sub_types = {
+        //     let sub_types;
+        //     match segment.arguments {
+        //         PathArguments::None => {
+        //             sub_types = vec![];
+        //         }
+        //         PathArguments::AngleBracketed(ref args) => {
+        //             let arg =
+        //                 first_and_only(args.args.iter()).expect("expected one argument cmk");
+        //             print!("arg: {:#?}", arg);
+        //             if let GenericArgument::Type(sub_type2) = arg {
+        //                 // cmk IterLike<PathLike>
 
-            let new_type = generic_gen.next().unwrap();
-            let new_fn_arg = FnArg::Typed(PatType {
-                ty: Box::new(new_type.clone()),
-                ..pat_type.clone()
-            });
+        //                 if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
+        //                     let sub_types2 = process_special(segment2, likes);
+        //                     sub_types = sub_types2;
+        //                 } else {
+        //                     sub_types = vec![sub_type2.clone()];
+        //                 }
+        //             } else {
+        //                 panic!("expected GenericArgument::Type cmk");
+        //             }
+        //         }
+        //         PathArguments::Parenthesized(_) => {
+        //             panic!("Parenthesized not supported")
+        //         }
+        //     };
+        //     sub_types
+        // };
 
-            // cmk why does the like_to_generic_param function need a move input?
-            let generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
+        let new_type = generic_gen.next().unwrap();
+        let new_fn_arg = FnArg::Typed(PatType {
+            ty: Box::new(new_type.clone()),
+            ..pat_type.clone()
+        });
 
-            let name = pat_ident.ident.clone(); // cmk too many clones
-            let stmts = vec![(like.ident_to_stmt)(name)];
+        // cmk why does the like_to_generic_param function need a move input?
+        let generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
 
-            Delta {
-                fn_arg: new_fn_arg,
-                generic_params,
-                stmts,
-            }
-        } else {
-            Delta {
-                fn_arg: old_fn_arg.clone(),
-                generic_params: vec![],
-                stmts: vec![],
-            }
+        let name = pat_ident.ident.clone(); // cmk too many clones
+        let stmts = vec![(like.ident_to_stmt)(name)];
+
+        Delta {
+            fn_arg: new_fn_arg,
+            generic_params,
+            stmts,
         }
     } else {
         Delta {
