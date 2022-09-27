@@ -8,11 +8,11 @@
 
 use quote::quote;
 use syn::__private::TokenStream; // todo don't use private
-use syn::punctuated::Punctuated;
-use syn::token::Comma;
-use syn::Type::Path;
-use syn::{parse_macro_input, parse_quote, parse_str, Block, Ident, Type};
-use syn::{FnArg, GenericParam, Generics, ItemFn, Pat, PatType, Signature, Stmt};
+use syn::{
+    parse_macro_input, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
+    GenericArgument, GenericParam, Generics, Ident, ItemFn, Pat, PatType, PathArguments, Signature,
+    Stmt, Type, Type::Path,
+};
 use uuid::Uuid;
 
 // #[proc_macro_attribute]
@@ -28,7 +28,8 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::Type>) -> ItemFn {
-    fn string_1(new_type: Type) -> GenericParam {
+    fn string_1(special: &Special) -> GenericParam {
+        let new_type = &special.ty;
         parse_quote!(#new_type : AsRef<str>)
     }
     fn string_2(name: Ident) -> Stmt {
@@ -36,7 +37,8 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
             let #name = #name.as_ref();
         }
     }
-    fn path_1(new_type: Type) -> GenericParam {
+    fn path_1(special: &Special) -> GenericParam {
+        let new_type = &special.ty;
         parse_quote!(#new_type : AsRef<Path>)
     }
     fn path_2(name: Ident) -> Stmt {
@@ -45,10 +47,12 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
         }
     }
 
-    fn iter_usize_1(new_type: Type) -> GenericParam {
-        parse_quote!(#new_type : IntoIterator<Item = usize>)
+    fn iter_1(special: &Special) -> GenericParam {
+        let new_type = &special.ty;
+        let sub_type = &special.sub_type;
+        parse_quote!(#new_type : IntoIterator<Item = #sub_type>) // cmk f32 is wrong
     }
-    fn iter_usize_2(name: Ident) -> Stmt {
+    fn iter_2(name: Ident) -> Stmt {
         parse_quote! {
             let #name = #name.into_iter();
         }
@@ -58,19 +62,19 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
     // cmk use a Hash table
     let likes = vec![
         Like {
+            special: Ident::new("IterLike", proc_macro2::Span::call_site()),
+            like_to_generic_param: &iter_1,
+            ident_to_stmt: &iter_2,
+        },
+        Like {
             special: Ident::new("StringLike", proc_macro2::Span::call_site()),
-            type_to_generic_param: &string_1,
+            like_to_generic_param: &string_1,
             ident_to_stmt: &string_2,
         },
         Like {
             special: Ident::new("PathLike", proc_macro2::Span::call_site()),
-            type_to_generic_param: &path_1,
+            like_to_generic_param: &path_1,
             ident_to_stmt: &path_2,
-        },
-        Like {
-            special: Ident::new("IterUsizeLike", proc_macro2::Span::call_site()),
-            type_to_generic_param: &iter_usize_1,
-            ident_to_stmt: &iter_usize_2,
         },
     ];
 
@@ -133,7 +137,8 @@ impl Iterator for UuidGenerator {
 
 struct Special {
     name: Ident,
-    ty: Type,
+    ty: Type, // cmk rename to type
+    sub_type: Option<Type>,
     like: Like,
 }
 
@@ -174,11 +179,34 @@ fn transform_inputs(
         if let FnArg::Typed(pat_type) = old_fn_arg {
             if let Pat::Ident(pat_ident) = &*pat_type.pat {
                 if let Path(type_path) = &*pat_type.ty {
+                    // print!("type_path: {:#?}", type_path);
                     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
+                        print!("segment: {:#?}", segment);
                         for like in &likes {
+                            print!("{:#?}=={:#?} ", segment.ident, like.special);
                             if segment.ident == like.special {
                                 // Create a new input with a generic type and remember the name and type.
                                 found_special = true;
+
+                                let sub_type: Option<Type>;
+                                match segment.arguments {
+                                    PathArguments::None => {
+                                        sub_type = None;
+                                    }
+                                    PathArguments::AngleBracketed(ref args) => {
+                                        let arg = first_and_only(args.args.iter())
+                                            .expect("expected one argument cmk");
+                                        print!("arg: {:#?}", arg);
+                                        if let GenericArgument::Type(sub_type2) = arg {
+                                            sub_type = Some(sub_type2.clone());
+                                        } else {
+                                            panic!("expected GenericArgument::Type cmk");
+                                        }
+                                    }
+                                    PathArguments::Parenthesized(_) => {
+                                        panic!("Parenthesized not supported")
+                                    }
+                                };
 
                                 let new_type = generic_gen.next().unwrap();
 
@@ -190,6 +218,7 @@ fn transform_inputs(
                                 specials.push(Special {
                                     name: pat_ident.ident.clone(),
                                     ty: new_type,
+                                    sub_type,
                                     like: like.clone(),
                                 });
 
@@ -217,8 +246,7 @@ fn transform_generics(
     for special in specials.iter() {
         // cmk why run this here. It could be run much earlier.
         // cmk why does the type_to_gp function need a move input?
-        let new_type = special.ty.clone();
-        let new_param = (special.like.type_to_generic_param)(new_type);
+        let new_param = (special.like.like_to_generic_param)(special);
         new_params.push(new_param);
     }
     new_params
@@ -239,7 +267,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, specials: &Vec<Special>) -> Vec<Stmt> 
 #[derive(Clone)]
 struct Like {
     special: Ident,
-    type_to_generic_param: &'static dyn Fn(Type) -> GenericParam,
+    like_to_generic_param: &'static dyn Fn(&Special) -> GenericParam,
     ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
 
@@ -389,7 +417,7 @@ mod tests {
     #[test]
     fn one_iter_usize_input() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterUsizeLike) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: IterLike<usize>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -406,6 +434,31 @@ mod tests {
         pub fn any_count_iter<S0: IntoIterator<Item = usize>>(
             i: S0,
         ) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter();
+            let count = i.count();
+            Ok(count)
+        }
+        assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
+    }
+
+    #[test]
+    fn one_iter_i32() {
+        let before = parse_quote! {
+        pub fn any_count_iter(i: IterLike<i32>) -> Result<usize, anyhow::Error> {
+            let count = i.count();
+            Ok(count)
+        }        };
+        let expected = parse_quote! {
+        pub fn any_count_iter<S0: IntoIterator<Item = i32>>(i: S0) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter();
+            let count = i.count();
+            Ok(count)
+        }};
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_item_fn_eq(&after, &expected);
+
+        pub fn any_count_iter<S0: IntoIterator<Item = i32>>(i: S0) -> Result<usize, anyhow::Error> {
             let i = i.into_iter();
             let count = i.count();
             Ok(count)
