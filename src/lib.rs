@@ -39,7 +39,7 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
         }
     }
     fn path_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
-        parse_quote!(#new_type : AsRef<Path>)
+        parse_quote!(#new_type : AsRef<std::path::Path>)
     }
     fn path_2(name: Ident) -> Stmt {
         parse_quote! {
@@ -178,6 +178,7 @@ fn transform_inputs(
     (new_fn_args, generic_params, stmts)
 }
 
+#[derive(Debug)]
 struct Delta1 {
     fn_arg: FnArg,
     generic_params: Vec<GenericParam>,
@@ -250,7 +251,9 @@ fn process_special(
         let mut sub_type = has_sub_type(segment.arguments);
         let mut generic_params: Vec<GenericParam> = vec![];
         if let Some(sub_type_inner) = &sub_type {
+            // println!("was {:#?}, now {:#?}", sub_type, sub_type_inner);
             let sub_delta2 = process_special(sub_type_inner, likes, generic_gen);
+            // println!("sub_delta2.new_type {:#?}", &sub_delta2.new_type);
             // cmk always pass old and new, never None
             if let Some(new_sub_type) = sub_delta2.new_type {
                 sub_type = Some(new_sub_type);
@@ -372,9 +375,9 @@ fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> 
     if let Path(type_path) = ty {
         // print!("type_path: {:#?}", type_path);
         if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-            print!("segment: {:#?}", segment);
+            // print!("segment: {:#?}", segment);
             for like in likes {
-                print!("{:#?}=={:#?} ", segment.ident, like.special);
+                // print!("{:#?}=={:#?} ", segment.ident, like.special);
                 if segment.ident == like.special {
                     // Create a new input with a generic type and remember the name and type.
                     return Some((segment.clone(), like.clone())); // todo review all clones
@@ -444,8 +447,14 @@ mod tests {
         if after == expected {
             return;
         }
-        println!("after: {}", item_fn_to_string(after));
-        println!("expected: {}", item_fn_to_string(expected));
+
+        let after_str = item_fn_to_string(after);
+        let expected_str = item_fn_to_string(expected);
+        if after_str == expected_str {
+            return;
+        }
+        println!("after: {}", after_str);
+        println!("expected: {}", expected_str);
         panic!("after != expected");
     }
 
@@ -454,7 +463,7 @@ mod tests {
         let mut uuid_generator = UuidGenerator::new();
         for i in 0..10 {
             let _ = uuid_generator.next();
-            println!("{:#?}", i);
+            // println!("{:#?}", i);
         }
     }
 
@@ -547,7 +556,7 @@ mod tests {
             Ok(count)
         }        };
         let expected = parse_quote! {
-        pub fn any_count_path<S0: AsRef<Path>>(p: S0) -> Result<usize, anyhow::Error> {
+        pub fn any_count_path<S0: AsRef<std::path::Path>>(p: S0) -> Result<usize, anyhow::Error> {
             let p = p.as_ref();
             let count = p.iter().count();
             Ok(count)
@@ -635,6 +644,7 @@ mod tests {
         }
         assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
     }
+
     #[test]
     fn one_iter_path() {
         let before = parse_quote! {
@@ -643,8 +653,8 @@ mod tests {
             Ok(sum_count)
         }        };
         let expected = parse_quote! {
-        pub fn any_count_iter<S0: IntoIterator<Item = S1>, S1: AsRef<std::path::Path>>(
-            i: S0,
+        pub fn any_count_iter<S0: AsRef<std::path::Path>, S1: IntoIterator<Item = S0>>(
+            i: S1,
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter(); // todo should the map be optional?
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
@@ -654,8 +664,8 @@ mod tests {
         let after = transform_fn(before, &mut generic_gen_test_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_count_iter<S0: IntoIterator<Item = S1>, S1: AsRef<std::path::Path>>(
-            i: S0,
+        pub fn any_count_iter<S0: AsRef<std::path::Path>, S1: IntoIterator<Item = S0>>(
+            i: S1,
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter(); // todo should the map be optional?
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
