@@ -170,22 +170,23 @@ fn transform_inputs(
         // If the input is 'Typed' (so not self), and
         // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
         // the type is 'Path' (so not, for example, a macro), and
+
+        let delta: Delta;
         if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
             // the one and only item in path is, for example, 'StringLike'
             // then replace the type with a generic type.
-            process_normal(
-                pat_type,
-                &likes,
-                generic_gen,
-                &mut new_fn_args,
-                &mut generic_params,
-                pat_ident,
-                &mut stmts,
-                old_fn_arg,
-            );
+            delta = process_normal(pat_ident, pat_type, old_fn_arg, &likes, generic_gen);
         } else {
-            new_fn_args.push(old_fn_arg.clone());
+            delta = Delta {
+                fn_arg: old_fn_arg.clone(),
+                generic_params: vec![],
+                stmts: vec![],
+            };
         }
+
+        new_fn_args.push(delta.fn_arg);
+        stmts = [stmts, delta.stmts].concat();
+        generic_params = [generic_params, delta.generic_params].concat();
         // see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
         // todo: Do these struct contains Box to make them easier to modify?
         // The box pattern syntax is experimental and can't use used in stable Rust.
@@ -193,33 +194,48 @@ fn transform_inputs(
     (new_fn_args, generic_params, stmts)
 }
 
+struct Delta {
+    fn_arg: FnArg,
+    generic_params: Vec<GenericParam>,
+    stmts: Vec<Stmt>,
+}
+
 fn process_normal(
+    pat_ident: &PatIdent,
     pat_type: &PatType,
+    old_fn_arg: &FnArg,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
-    new_fn_args: &mut Punctuated<FnArg, Comma>,
-    generic_params: &mut Vec<GenericParam>,
-    pat_ident: &PatIdent,
-    stmts: &mut Vec<Stmt>,
-    old_fn_arg: &FnArg,
-) {
+) -> Delta {
+    let new_fn_arg: FnArg;
+    let generic_params: Vec<GenericParam>;
+    let stmts: Vec<Stmt>;
+
     if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
         let sub_types = process_special(segment, likes);
 
         let new_type = generic_gen.next().unwrap();
-        new_fn_args.push(FnArg::Typed(PatType {
+        new_fn_arg = FnArg::Typed(PatType {
             ty: Box::new(new_type.clone()),
             ..pat_type.clone()
-        }));
+        });
 
         // cmk why does the type_to_gp function need a move input?
         let sub_type = first_and_only(sub_types.iter());
-        generic_params.push((like.like_to_generic_param)(&new_type, sub_type));
+        generic_params = vec![(like.like_to_generic_param)(&new_type, sub_type)];
 
         let name = pat_ident.ident.clone(); // cmk too many clones
-        stmts.push((like.ident_to_stmt)(name));
+        stmts = vec![(like.ident_to_stmt)(name)];
     } else {
-        new_fn_args.push(old_fn_arg.clone());
+        new_fn_arg = old_fn_arg.clone();
+        generic_params = vec![];
+        stmts = vec![];
+    }
+
+    Delta {
+        fn_arg: new_fn_arg,
+        generic_params,
+        stmts,
     }
 }
 
