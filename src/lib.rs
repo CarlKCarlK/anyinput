@@ -7,6 +7,7 @@
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 
 use quote::quote;
+use syn::PathSegment;
 use syn::__private::TokenStream; // todo don't use private
 use syn::{
     parse_macro_input, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
@@ -178,54 +179,42 @@ fn transform_inputs(
 
         if let FnArg::Typed(pat_type) = old_fn_arg {
             if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                if let Path(type_path) = &*pat_type.ty {
-                    // print!("type_path: {:#?}", type_path);
-                    if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-                        print!("segment: {:#?}", segment);
-                        for like in &likes {
-                            print!("{:#?}=={:#?} ", segment.ident, like.special);
-                            if segment.ident == like.special {
-                                // Create a new input with a generic type and remember the name and type.
-                                found_special = true;
+                if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
+                    found_special = true;
 
-                                let sub_type: Option<Type>;
-                                match segment.arguments {
-                                    PathArguments::None => {
-                                        sub_type = None;
-                                    }
-                                    PathArguments::AngleBracketed(ref args) => {
-                                        let arg = first_and_only(args.args.iter())
-                                            .expect("expected one argument cmk");
-                                        print!("arg: {:#?}", arg);
-                                        if let GenericArgument::Type(sub_type2) = arg {
-                                            sub_type = Some(sub_type2.clone());
-                                        } else {
-                                            panic!("expected GenericArgument::Type cmk");
-                                        }
-                                    }
-                                    PathArguments::Parenthesized(_) => {
-                                        panic!("Parenthesized not supported")
-                                    }
-                                };
-
-                                let new_type = generic_gen.next().unwrap();
-
-                                new_fn_args.push(FnArg::Typed(PatType {
-                                    ty: Box::new(new_type.clone()),
-                                    ..pat_type.clone()
-                                }));
-
-                                specials.push(Special {
-                                    name: pat_ident.ident.clone(),
-                                    ty: new_type,
-                                    sub_type,
-                                    like: like.clone(),
-                                });
-
-                                break;
+                    let sub_type: Option<Type>;
+                    match segment.arguments {
+                        PathArguments::None => {
+                            sub_type = None;
+                        }
+                        PathArguments::AngleBracketed(ref args) => {
+                            let arg = first_and_only(args.args.iter())
+                                .expect("expected one argument cmk");
+                            print!("arg: {:#?}", arg);
+                            if let GenericArgument::Type(sub_type2) = arg {
+                                sub_type = Some(sub_type2.clone());
+                            } else {
+                                panic!("expected GenericArgument::Type cmk");
                             }
                         }
-                    }
+                        PathArguments::Parenthesized(_) => {
+                            panic!("Parenthesized not supported")
+                        }
+                    };
+
+                    let new_type = generic_gen.next().unwrap();
+
+                    new_fn_args.push(FnArg::Typed(PatType {
+                        ty: Box::new(new_type.clone()),
+                        ..pat_type.clone()
+                    }));
+
+                    specials.push(Special {
+                        name: pat_ident.ident.clone(),
+                        ty: new_type,
+                        sub_type,
+                        like: like.clone(),
+                    });
                 }
             }
         }
@@ -236,6 +225,23 @@ fn transform_inputs(
     (new_fn_args, specials)
 }
 
+// cmk rename
+fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
+    if let Path(type_path) = ty {
+        // print!("type_path: {:#?}", type_path);
+        if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
+            print!("segment: {:#?}", segment);
+            for like in likes {
+                print!("{:#?}=={:#?} ", segment.ident, like.special);
+                if segment.ident == like.special {
+                    // Create a new input with a generic type and remember the name and type.
+                    return Some((segment.clone(), like.clone())); // todo review all clones
+                }
+            }
+        }
+    }
+    None
+}
 // Define generics for each special input type. For example, 'S0 : AsRef<str>'
 #[allow(clippy::ptr_arg)]
 fn transform_generics(
@@ -491,5 +497,33 @@ mod tests {
             Ok(count)
         }
         assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
+    }
+    #[test]
+    fn one_iter_path() {
+        let before = parse_quote! {
+        pub fn any_count_iter(i: IterLike<PathLike>) -> Result<usize, anyhow::Error> {
+            let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
+            Ok(sum_count)
+        }        };
+        let expected = parse_quote! {
+        pub fn any_count_iter<S0: IntoIterator<Item = S1>, S1: AsRef<std::path::Path>>(
+            i: S0,
+        ) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter(); // todo should the map be optional?
+            let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
+            Ok(sum_count)
+        }};
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_item_fn_eq(&after, &expected);
+
+        pub fn any_count_iter<S0: IntoIterator<Item = S1>, S1: AsRef<std::path::Path>>(
+            i: S0,
+        ) -> Result<usize, anyhow::Error> {
+            let i = i.into_iter(); // todo should the map be optional?
+            let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
+            Ok(sum_count)
+        }
+        assert_eq!(any_count_iter(["a/b", "d"]).unwrap(), 3);
     }
 }
