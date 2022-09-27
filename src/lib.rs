@@ -182,39 +182,15 @@ fn transform_inputs(
                 if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
                     found_special = true;
 
-                    let sub_type: Option<Type>;
-                    match segment.arguments {
-                        PathArguments::None => {
-                            sub_type = None;
-                        }
-                        PathArguments::AngleBracketed(ref args) => {
-                            let arg = first_and_only(args.args.iter())
-                                .expect("expected one argument cmk");
-                            print!("arg: {:#?}", arg);
-                            if let GenericArgument::Type(sub_type2) = arg {
-                                sub_type = Some(sub_type2.clone());
-                            } else {
-                                panic!("expected GenericArgument::Type cmk");
-                            }
-                        }
-                        PathArguments::Parenthesized(_) => {
-                            panic!("Parenthesized not supported")
-                        }
-                    };
-
-                    let new_type = generic_gen.next().unwrap();
-
-                    new_fn_args.push(FnArg::Typed(PatType {
-                        ty: Box::new(new_type.clone()),
-                        ..pat_type.clone()
-                    }));
-
-                    specials.push(Special {
-                        name: pat_ident.ident.clone(),
-                        ty: new_type,
-                        sub_type,
-                        like: like.clone(),
-                    });
+                    process_special(
+                        segment,
+                        generic_gen,
+                        &mut new_fn_args,
+                        pat_type,
+                        &mut specials,
+                        pat_ident,
+                        like,
+                    );
                 }
             }
         }
@@ -223,6 +199,50 @@ fn transform_inputs(
         }
     }
     (new_fn_args, specials)
+}
+
+fn process_special(
+    segment: PathSegment,
+    generic_gen: &mut impl Iterator<Item = Type>,
+    new_fn_args: &mut Punctuated<FnArg, Comma>,
+    pat_type: &PatType,
+    specials: &mut Vec<Special>,
+    pat_ident: &syn::PatIdent,
+    like: Like,
+) {
+    let sub_type: Option<Type>;
+    match segment.arguments {
+        PathArguments::None => {
+            sub_type = None;
+        }
+        PathArguments::AngleBracketed(ref args) => {
+            let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
+            print!("arg: {:#?}", arg);
+            if let GenericArgument::Type(sub_type2) = arg {
+                sub_type = Some(sub_type2.clone());
+
+                // if let Some((segment2, like2)) = is_special_type(&sub_type2, &likes)
+                // {
+                // }
+            } else {
+                panic!("expected GenericArgument::Type cmk");
+            }
+        }
+        PathArguments::Parenthesized(_) => {
+            panic!("Parenthesized not supported")
+        }
+    };
+    let new_type = generic_gen.next().unwrap();
+    new_fn_args.push(FnArg::Typed(PatType {
+        ty: Box::new(new_type.clone()),
+        ..pat_type.clone()
+    }));
+    specials.push(Special {
+        name: pat_ident.ident.clone(),
+        ty: new_type,
+        sub_type,
+        like,
+    });
 }
 
 // cmk rename
