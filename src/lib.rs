@@ -50,8 +50,9 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
 
     fn iter_1(special: &Special) -> GenericParam {
         let new_type = &special.ty;
-        let sub_type = &special.sub_type;
-        parse_quote!(#new_type : IntoIterator<Item = #sub_type>) // cmk f32 is wrong
+        let sub_types = &special.sub_types;
+        let sub_type = &sub_types[0]; // cmks
+        parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
     }
     fn iter_2(name: Ident) -> Stmt {
         parse_quote! {
@@ -138,8 +139,8 @@ impl Iterator for UuidGenerator {
 
 struct Special {
     name: Ident,
-    ty: Type, // cmk rename to type
-    sub_type: Option<Type>,
+    ty: Type,
+    sub_types: Vec<Type>, // cmk!!!! make this a Vec<Type>
     like: Like,
 }
 
@@ -182,7 +183,7 @@ fn transform_inputs(
                 if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
                     found_special = true;
 
-                    let sub_type = process_special(segment);
+                    let sub_types = process_special(segment);
 
                     let new_type = generic_gen.next().unwrap();
                     new_fn_args.push(FnArg::Typed(PatType {
@@ -192,7 +193,7 @@ fn transform_inputs(
                     specials.push(Special {
                         name: pat_ident.ident.clone(),
                         ty: new_type,
-                        sub_type,
+                        sub_types,
                         like,
                     });
                 }
@@ -205,7 +206,7 @@ fn transform_inputs(
     (new_fn_args, specials)
 }
 
-fn process_special(segment: PathSegment) -> Option<Type> {
+fn process_special(segment: PathSegment) -> Vec<Type> {
     let sub_type: Option<Type>;
     match segment.arguments {
         PathArguments::None => {
@@ -228,7 +229,7 @@ fn process_special(segment: PathSegment) -> Option<Type> {
             panic!("Parenthesized not supported")
         }
     };
-    sub_type
+    sub_type.iter().cloned().collect()
 }
 
 // cmk rename
