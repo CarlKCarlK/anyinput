@@ -200,10 +200,10 @@ fn process_fn_arg(
     // the type is 'Path' (so not, for example, a macro), and
     if let Some((pat_ident, pat_type)) = is_normal(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        let delta2 = process_special(pat_type, likes, generic_gen);
+        let delta2 = process_special(&*pat_type.ty, likes, generic_gen);
         if let Some(like) = delta2.like {
             let new_fn_arg = FnArg::Typed(PatType {
-                ty: Box::new(delta2.new_type.unwrap().clone()), // cmk remove unwrap
+                ty: Box::new(delta2.new_type.unwrap()), // cmk remove unwrap
                 ..pat_type.clone()
             });
             let name = pat_ident.ident.clone(); // cmk too many clones
@@ -230,11 +230,11 @@ fn process_fn_arg(
 }
 
 fn process_special(
-    pat_type: &PatType,
+    ty: &Type,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
 ) -> Delta2 {
-    if let Some((segment, like)) = is_special_type(&*pat_type.ty, likes) {
+    if let Some((segment, like)) = is_special_type(ty, likes) {
         // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
         // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
         // v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
@@ -247,6 +247,7 @@ fn process_special(
         // if at the type-level, define the new stmt.
         let sub_type = has_sub_type(segment.arguments);
         if let Some(sub_type_inner) = &sub_type {
+            let sub_delta2 = process_special(sub_type_inner, likes, generic_gen);
             // Look for special
         }
 
