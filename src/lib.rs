@@ -5,6 +5,7 @@
 // todo add nice error enum
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
+// cmk what about Vec<StringLike>?
 
 use quote::quote;
 use syn::PathSegment;
@@ -81,10 +82,11 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
     ];
 
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
-    let (new_inputs, specials) = transform_inputs(&old_fn.sig.inputs, generic_gen, likes);
+    let (new_inputs, specials, generic_params) =
+        transform_inputs(&old_fn.sig.inputs, generic_gen, likes);
 
     // For each special input found, define a new generic, for example, 'S0 : AsRef<str>'
-    let new_generics = transform_generics(&old_fn.sig.generics.params, &specials);
+    let new_generics = transform_generics(&old_fn.sig.generics.params, generic_params);
 
     // For each special input found, add a statement defining a new local variable. For example, 'let s = s.as_ref();'
     let new_stmts = transform_stmts(&old_fn.block.stmts, &specials);
@@ -137,6 +139,7 @@ impl Iterator for UuidGenerator {
     }
 }
 
+#[derive(Clone)]
 struct Special {
     name: Ident,
     ty: Type,
@@ -155,15 +158,25 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 
 // Look for special inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
 // Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
+
+// for each input, if it is top-level special, replace it with generic(s) and remember the generic(s) and the top-level variable.
+// v: i32 -> v: i32, <>, {}
+// v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
+// v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
+// v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
+// v: [StringLike] -> v: [S0], <S0: AsRef<str>>, {}
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = Type>,
     likes: Vec<Like>,
-) -> (Punctuated<FnArg, Comma>, Vec<Special>) {
+) -> (Punctuated<FnArg, Comma>, Vec<Special>, Vec<GenericParam>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
     // Remember the names and types of the special inputs.
     let mut specials: Vec<Special> = vec![];
+    let mut generic_params: Vec<GenericParam> = vec![];
 
     for old_fn_arg in old_inputs {
         let mut found_special = false; // todo think of other ways to control the flow
@@ -183,19 +196,24 @@ fn transform_inputs(
                 if let Some((segment, like)) = is_special_type(&*pat_type.ty, &likes) {
                     found_special = true;
 
-                    let sub_types = process_special(segment);
+                    let sub_types = process_special(segment, &likes);
 
                     let new_type = generic_gen.next().unwrap();
                     new_fn_args.push(FnArg::Typed(PatType {
                         ty: Box::new(new_type.clone()),
                         ..pat_type.clone()
                     }));
-                    specials.push(Special {
+
+                    let special = Special {
                         name: pat_ident.ident.clone(),
                         ty: new_type,
                         sub_types,
                         like,
-                    });
+                    };
+                    specials.push(special.clone());
+
+                    // cmk why does the type_to_gp function need a move input?
+                    generic_params.push((special.like.like_to_generic_param)(&special));
                 }
             }
         }
@@ -203,24 +221,27 @@ fn transform_inputs(
             new_fn_args.push(old_fn_arg.clone());
         }
     }
-    (new_fn_args, specials)
+    (new_fn_args, specials, generic_params)
 }
 
-fn process_special(segment: PathSegment) -> Vec<Type> {
-    let sub_type: Option<Type>;
+fn process_special(segment: PathSegment, likes: &Vec<Like>) -> Vec<Type> {
+    let sub_types;
     match segment.arguments {
         PathArguments::None => {
-            sub_type = None;
+            sub_types = vec![];
         }
         PathArguments::AngleBracketed(ref args) => {
             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
             print!("arg: {:#?}", arg);
             if let GenericArgument::Type(sub_type2) = arg {
-                sub_type = Some(sub_type2.clone());
+                // cmk IterLike<PathLike>
 
-                // if let Some((segment2, like2)) = is_special_type(&sub_type2, &likes)
-                // {
-                // }
+                if let Some((segment2, _like2)) = is_special_type(sub_type2, likes) {
+                    let sub_types2 = process_special(segment2, likes);
+                    sub_types = sub_types2;
+                } else {
+                    sub_types = vec![sub_type2.clone()];
+                }
             } else {
                 panic!("expected GenericArgument::Type cmk");
             }
@@ -229,7 +250,7 @@ fn process_special(segment: PathSegment) -> Vec<Type> {
             panic!("Parenthesized not supported")
         }
     };
-    sub_type.iter().cloned().collect()
+    sub_types
 }
 
 // cmk rename
@@ -253,14 +274,11 @@ fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> 
 #[allow(clippy::ptr_arg)]
 fn transform_generics(
     old_params: &Punctuated<GenericParam, Comma>,
-    specials: &Vec<Special>,
+    generic_params: Vec<GenericParam>,
 ) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
-    for special in specials.iter() {
-        // cmk why run this here. It could be run much earlier.
-        // cmk why does the type_to_gp function need a move input?
-        let new_param = (special.like.like_to_generic_param)(special);
-        new_params.push(new_param);
+    for new_param in generic_params.iter() {
+        new_params.push(new_param.clone()); // cmk too much cloning
     }
     new_params
 }
