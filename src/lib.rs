@@ -135,14 +135,6 @@ impl Iterator for UuidGenerator {
     }
 }
 
-#[derive(Clone)]
-struct Special {
-    name: Ident,
-    ty: Type,
-    sub_types: Vec<Type>, // cmk!!!! make this a Vec<Type>
-    like: Like,
-}
-
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     let first = iter.next()?;
     if iter.next().is_some() {
@@ -200,13 +192,12 @@ fn transform_inputs(
                         ..pat_type.clone()
                     }));
 
-                    let name = pat_ident.ident.clone();
-                    let sub_type = first_and_only(sub_types.iter());
-
                     // cmk why does the type_to_gp function need a move input?
-                    generic_params.push((&like.like_to_generic_param)(&new_type, sub_type));
+                    let sub_type = first_and_only(sub_types.iter());
+                    generic_params.push((like.like_to_generic_param)(&new_type, sub_type));
 
-                    stmts.push((&like.ident_to_stmt)(name));
+                    let name = pat_ident.ident.clone(); // cmk too many clones
+                    stmts.push((like.ident_to_stmt)(name));
                 }
             }
         }
