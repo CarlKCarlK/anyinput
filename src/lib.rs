@@ -198,7 +198,7 @@ fn process_fn_arg(
         let delta2 = process_type(&*pat_type.ty, likes, generic_gen);
         if let Some(like) = delta2.like {
             let new_fn_arg = FnArg::Typed(PatType {
-                ty: Box::new(delta2.new_type_cmk),
+                ty: Box::new(delta2.new_type),
                 ..pat_type.clone()
             });
             let name = pat_ident.ident.clone(); // cmk too many clones
@@ -236,7 +236,7 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 }
 
 struct DeltaType {
-    new_type_cmk: Type,
+    new_type: Type,
     like: Option<Like>,
     generic_params: Vec<GenericParam>,
 }
@@ -260,31 +260,29 @@ fn process_type(
 
         // cmk rewrite this without the mut
         let sub_type: Option<Type>;
-        let mut generic_params: Vec<GenericParam> = vec![];
+        let mut generic_params: Vec<GenericParam>;
         if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
-            // cmk always pass old and new, never None
             let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
-            sub_type = Some(sub_delta2.new_type_cmk);
-            generic_params = [generic_params, sub_delta2.generic_params].concat();
+            sub_type = Some(sub_delta2.new_type);
+            generic_params = sub_delta2.generic_params;
         } else {
             sub_type = None;
+            generic_params = vec![];
         }
 
-        let new_type = generic_gen.next().unwrap();
-
         // cmk why does the like_to_generic_param function need a move input?
-        let generic_params_0 = vec![(like.like_to_generic_param)(&new_type, sub_type.as_ref())];
-        let generic_params = [generic_params, generic_params_0].concat();
+        let new_type = generic_gen.next().unwrap();
+        generic_params.push((like.like_to_generic_param)(&new_type, sub_type.as_ref()));
 
         DeltaType {
             like: Some(like),
-            new_type_cmk: new_type,
+            new_type,
             generic_params,
         }
     } else {
         DeltaType {
             like: None,
-            new_type_cmk: ty.clone(),
+            new_type: ty.clone(),
             generic_params: vec![],
         }
     }
