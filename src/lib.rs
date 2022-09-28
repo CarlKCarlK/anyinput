@@ -258,17 +258,7 @@ fn process_type(
         // define our own generic type, S0, and add it to the list of generics
         // if at the type-level, define the new stmt.
 
-        // cmk rewrite this without the mut
-        let sub_type: Option<Type>;
-        let mut generic_params: Vec<GenericParam>;
-        if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
-            let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
-            sub_type = Some(sub_delta2.new_type);
-            generic_params = sub_delta2.generic_params;
-        } else {
-            sub_type = None;
-            generic_params = vec![];
-        }
+        let (sub_type, mut generic_params) = process_any_subtype(segment, likes, generic_gen);
 
         // cmk why does the like_to_generic_param function need a move input?
         let new_type = generic_gen.next().unwrap();
@@ -285,6 +275,19 @@ fn process_type(
             new_type: ty.clone(),
             generic_params: vec![],
         }
+    }
+}
+
+fn process_any_subtype(
+    segment: PathSegment,
+    likes: &Vec<Like>,
+    generic_gen: &mut impl Iterator<Item = Type>,
+) -> (Option<Type>, Vec<GenericParam>) {
+    if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
+        let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
+        (Some(sub_delta2.new_type), sub_delta2.generic_params)
+    } else {
+        (None, vec![])
     }
 }
 
