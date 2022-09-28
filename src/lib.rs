@@ -5,6 +5,7 @@
 // todo add nice error enum
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
+// https://docs.rs/syn/latest/syn/fold/index.html#example
 // cmk what about Vec<StringLike>?
 
 use quote::quote;
@@ -261,7 +262,7 @@ struct Struct1 {
 
 impl Fold for Struct1 {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
-        println!("fold_type_path: {:#?}", type_path);
+        println!("{}", quote!(#type_path));
         type_path
     }
 }
@@ -333,6 +334,11 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
     }
 }
 
+fn type_path_to_ident(type_path: &TypePath) -> String {
+    let segment = first_and_only(type_path.path.segments.iter()).expect("expected one segment cmk");
+    segment.ident.to_string()
+}
+
 fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
     if let Type::Path(type_path) = ty {
         // print!("type_path: {:#?}", type_path);
@@ -384,21 +390,22 @@ struct Like {
 mod tests {
     // cmk use prettyplease::unparse;
     use crate::{transform_fn, Struct1, UuidGenerator};
-    use prettyplease::unparse;
-    use syn::{fold::Fold, parse_quote, parse_str, File, Item, ItemFn, Type};
+    // cmk remove from cargo use prettyplease::unparse;
+    use quote::quote;
+    use syn::{fold::Fold, parse_quote, parse_str, ItemFn, Type};
 
     fn str_to_type(s: &str) -> Type {
         parse_str(s).unwrap()
     }
 
-    fn item_fn_to_string(item_fn: &ItemFn) -> String {
-        let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
-        let new_file = File {
-            items: vec![Item::Fn(item_fn.clone())],
-            ..old_file
-        };
-        unparse(&new_file)
-    }
+    // fn item_fn_to_string(item_fn: &ItemFn) -> String {
+    //     let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
+    //     let new_file = File {
+    //         items: vec![Item::Fn(item_fn.clone())],
+    //         ..old_file
+    //     };
+    //     unparse(&new_file)
+    // }
 
     fn generic_gen_test_factory() -> impl Iterator<Item = Type> + 'static {
         (0usize..)
@@ -411,8 +418,8 @@ mod tests {
             return;
         }
 
-        let after_str = item_fn_to_string(after);
-        let expected_str = item_fn_to_string(expected);
+        let after_str = format!("{}", quote!(#after));
+        let expected_str = format!("{}", quote!(#expected));
         if after_str == expected_str {
             return;
         }
@@ -668,13 +675,11 @@ mod tests {
 
     #[test]
     fn fold_one_path() {
-        let before = parse_quote! {
-        pub fn any_count_path(p: PathLike) -> Result<usize, anyhow::Error> {
-            let count = p.iter().count();
-            Ok(count)
-        }        };
+        let before = parse_quote! {IterLike<PathLike> };
+        println!("before: {:#?}", before);
         let mut struct1 = Struct1 {};
-        let result = struct1.fold_item_fn(before);
-        println!("result: {:#?}", result);
+        let _result = struct1.fold_type(before);
+
+        // println!("result: {:#?}", result);
     }
 }
