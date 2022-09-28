@@ -31,37 +31,38 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(quote!(#new_item_fn))
 }
 
-pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::Type>) -> ItemFn {
-    fn string_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
-        parse_quote!(#new_type : AsRef<str>)
+fn string_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
+    parse_quote!(#new_type : AsRef<str>)
+}
+fn string_2(name: Ident) -> Stmt {
+    parse_quote! {
+        let #name = #name.as_ref();
     }
-    fn string_2(name: Ident) -> Stmt {
-        parse_quote! {
-            let #name = #name.as_ref();
-        }
+}
+fn path_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
+    parse_quote!(#new_type : AsRef<std::path::Path>)
+}
+fn path_2(name: Ident) -> Stmt {
+    parse_quote! {
+        let #name = #name.as_ref();
     }
-    fn path_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
-        parse_quote!(#new_type : AsRef<std::path::Path>)
-    }
-    fn path_2(name: Ident) -> Stmt {
-        parse_quote! {
-            let #name = #name.as_ref();
-        }
-    }
+}
 
-    fn iter_1(new_type: &Type, sub_type: Option<&Type>) -> GenericParam {
-        let sub_type = sub_type.expect("iter_1: sub_type");
-        parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
+fn iter_1(new_type: &Type, sub_type: Option<&Type>) -> GenericParam {
+    let sub_type = sub_type.expect("iter_1: sub_type");
+    parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
+}
+fn iter_2(name: Ident) -> Stmt {
+    parse_quote! {
+        let #name = #name.into_iter();
     }
-    fn iter_2(name: Ident) -> Stmt {
-        parse_quote! {
-            let #name = #name.into_iter();
-        }
-    }
+}
 
-    // cmk use Traits
-    // cmk use a Hash table
-    let likes = vec![
+// cmk use Traits
+// cmk use a Hash table
+
+fn to_likes() -> Vec<Like> {
+    vec![
         Like {
             special: Ident::new("IterLike", proc_macro2::Span::call_site()),
             like_to_generic_param: &iter_1,
@@ -77,7 +78,11 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::
             like_to_generic_param: &path_1,
             ident_to_stmt: &path_2,
         },
-    ];
+    ]
+}
+
+pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::Type>) -> ItemFn {
+    let likes = to_likes();
 
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, generic_params, stmts) =
@@ -257,13 +262,17 @@ struct DeltaType {
 
 struct Struct1 {
     // cmk rename
-    // likes: Vec<Like>,
+    likes: Vec<Like>,
 }
 
 impl Fold for Struct1 {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
+        let mut type_path = fold_type_path(self, type_path);
+        if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
+            // cmk
+        }
         println!("fold_type_path: {}", quote!(#type_path));
-        fold_type_path(self, type_path)
+        type_path
     }
 }
 
@@ -342,14 +351,19 @@ fn type_path_to_ident(type_path: &TypePath) -> String {
 fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
     if let Type::Path(type_path) = ty {
         // print!("type_path: {:#?}", type_path);
-        if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-            // print!("segment: {:#?}", segment);
-            for like in likes {
-                // print!("{:#?}=={:#?} ", segment.ident, like.special);
-                if segment.ident == like.special {
-                    // Create a new input with a generic type and remember the name and type.
-                    return Some((segment.clone(), like.clone())); // todo review all clones
-                }
+        return is_special_type_path(type_path, likes);
+    }
+    None
+}
+
+fn is_special_type_path(type_path: &TypePath, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
+    if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
+        // print!("segment: {:#?}", segment);
+        for like in likes {
+            // print!("{:#?}=={:#?} ", segment.ident, like.special);
+            if segment.ident == like.special {
+                // Create a new input with a generic type and remember the name and type.
+                return Some((segment.clone(), like.clone())); // todo review all clones
             }
         }
     }
@@ -389,7 +403,7 @@ struct Like {
 #[cfg(test)]
 mod tests {
     // cmk use prettyplease::unparse;
-    use crate::{transform_fn, Struct1, UuidGenerator};
+    use crate::{to_likes, transform_fn, Struct1, UuidGenerator};
     // cmk remove from cargo use prettyplease::unparse;
     use quote::quote;
     use syn::{fold::Fold, parse_quote, parse_str, ItemFn, Type};
@@ -679,7 +693,7 @@ mod tests {
         // cmk 9 rules: use format!(quote!()) to generate strings of code
         let before = parse_quote! {IterLike<PathLike> };
         println!("before: {}", quote!(before));
-        let mut struct1 = Struct1 {};
+        let mut struct1 = Struct1 { likes: to_likes() };
         let _result = struct1.fold_type(before);
 
         // println!("result: {:#?}", result);
