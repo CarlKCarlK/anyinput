@@ -10,7 +10,7 @@
 
 use quote::quote;
 use syn::__private::TokenStream;
-use syn::fold::Fold;
+use syn::fold::{fold_type_path, Fold};
 // todo don't use private
 use syn::{
     parse_macro_input, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
@@ -262,8 +262,8 @@ struct Struct1 {
 
 impl Fold for Struct1 {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
-        println!("{}", quote!(#type_path));
-        type_path
+        println!("fold_type_path: {}", quote!(#type_path));
+        fold_type_path(self, type_path)
     }
 }
 
@@ -675,8 +675,10 @@ mod tests {
 
     #[test]
     fn fold_one_path() {
+        // cmk 9 rules: parse_quote!
+        // cmk 9 rules: use format!(quote!()) to generate strings of code
         let before = parse_quote! {IterLike<PathLike> };
-        println!("before: {:#?}", before);
+        println!("before: {}", quote!(before));
         let mut struct1 = Struct1 {};
         let _result = struct1.fold_type(before);
 
