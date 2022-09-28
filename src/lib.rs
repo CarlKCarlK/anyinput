@@ -196,18 +196,12 @@ fn process_fn_arg(
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
         let delta_type = process_type(&*pat_type.ty, likes, generic_gen);
-        // If the top-level is special, add a stmt.
-        let stmts: Vec<Stmt>;
-        if let Some(like) = delta_type.like {
-            let name = pat_ident.ident.clone(); // cmk too many clones
-            stmts = vec![(like.ident_to_stmt)(name)];
-        } else {
-            stmts = vec![];
-        }
         let new_fn_arg = FnArg::Typed(PatType {
-            ty: Box::new(delta_type.new_type),
+            ty: Box::new(delta_type.new_type.clone()),
             ..pat_type.clone()
         });
+
+        let stmts = generate_any_stmts(&delta_type, pat_ident);
 
         DeltaFnArg {
             fn_arg: new_fn_arg,
@@ -220,6 +214,15 @@ fn process_fn_arg(
             generic_params: vec![],
             stmts: vec![],
         }
+    }
+}
+
+fn generate_any_stmts(delta_type: &DeltaType, pat_ident: &PatIdent) -> Vec<Stmt> {
+    if let Some(like) = &delta_type.like {
+        let name = pat_ident.ident.clone(); // cmk too many clones
+        vec![(like.ident_to_stmt)(name)]
+    } else {
+        vec![]
     }
 }
 
