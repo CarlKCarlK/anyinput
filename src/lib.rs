@@ -192,7 +192,7 @@ fn process_fn_arg(
 ) -> DeltaFnArg {
     // If the input is 'Typed' (so not self), and
     // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
-    // the type is 'Path' (so not, for example, a macro), and
+    // the type is 'Path' (so not, for example, a macro)
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
         let delta_type = process_type(&*pat_type.ty, likes, generic_gen);
@@ -209,7 +209,6 @@ fn process_fn_arg(
             ..pat_type.clone()
         });
 
-        // panic!("todo");
         DeltaFnArg {
             fn_arg: new_fn_arg,
             generic_params: delta_type.generic_params,
