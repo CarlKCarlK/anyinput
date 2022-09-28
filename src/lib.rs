@@ -195,25 +195,25 @@ fn process_fn_arg(
     // the type is 'Path' (so not, for example, a macro), and
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        let delta2 = process_type(&*pat_type.ty, likes, generic_gen);
-        if let Some(like) = delta2.like {
-            let new_fn_arg = FnArg::Typed(PatType {
-                ty: Box::new(delta2.new_type),
-                ..pat_type.clone()
-            });
+        let delta_type = process_type(&*pat_type.ty, likes, generic_gen);
+        // If the top-level is special, add a stmt.
+        let stmts: Vec<Stmt>;
+        if let Some(like) = delta_type.like {
             let name = pat_ident.ident.clone(); // cmk too many clones
-            let stmts = vec![(like.ident_to_stmt)(name)];
-            DeltaFnArg {
-                fn_arg: new_fn_arg,
-                generic_params: delta2.generic_params,
-                stmts,
-            }
+            stmts = vec![(like.ident_to_stmt)(name)];
         } else {
-            DeltaFnArg {
-                fn_arg: old_fn_arg.clone(),
-                generic_params: vec![],
-                stmts: vec![],
-            }
+            stmts = vec![];
+        }
+        let new_fn_arg = FnArg::Typed(PatType {
+            ty: Box::new(delta_type.new_type),
+            ..pat_type.clone()
+        });
+
+        // panic!("todo");
+        DeltaFnArg {
+            fn_arg: new_fn_arg,
+            generic_params: delta_type.generic_params,
+            stmts,
         }
     } else {
         DeltaFnArg {
@@ -240,6 +240,16 @@ struct DeltaType {
     like: Option<Like>,
     generic_params: Vec<GenericParam>,
 }
+
+// fn process_type_new(
+//     ty: &Type,
+//     likes: &Vec<Like>,
+//     generic_gen: &mut impl Iterator<Item = Type>,
+// ) -> DeltaType {
+//     // Search type and its subtypes for special types starting at the deepest level.
+//     // When one is found, replace it with a generic.
+//     // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
+// }
 
 fn process_type(
     ty: &Type,
