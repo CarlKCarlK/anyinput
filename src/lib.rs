@@ -8,13 +8,14 @@
 // cmk what about Vec<StringLike>?
 
 use quote::quote;
-use syn::__private::TokenStream; // todo don't use private
+use syn::__private::TokenStream;
+use syn::fold::Fold;
+// todo don't use private
 use syn::{
     parse_macro_input, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
-    GenericArgument, GenericParam, Generics, Ident, ItemFn, Pat, PatType, PathArguments, Signature,
-    Stmt, Type, Type::Path,
+    GenericArgument, GenericParam, Generics, Ident, ItemFn, Pat, PatIdent, PatType, PathArguments,
+    PathSegment, Signature, Stmt, Type, TypePath,
 };
-use syn::{PatIdent, PathSegment};
 use uuid::Uuid;
 
 // #[proc_macro_attribute]
@@ -247,10 +248,23 @@ struct DeltaType {
 //     likes: &Vec<Like>,
 //     generic_gen: &mut impl Iterator<Item = Type>,
 // ) -> DeltaType {
+//     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
 //     // Search type and its subtypes for special types starting at the deepest level.
 //     // When one is found, replace it with a generic.
 //     // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
 // }
+
+struct Struct1 {
+    // cmk rename
+    // likes: Vec<Like>,
+}
+
+impl Fold for Struct1 {
+    fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
+        println!("fold_type_path: {:#?}", type_path);
+        type_path
+    }
+}
 
 fn process_type(
     ty: &Type,
@@ -320,7 +334,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
 }
 
 fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
-    if let Path(type_path) = ty {
+    if let Type::Path(type_path) = ty {
         // print!("type_path: {:#?}", type_path);
         if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
             // print!("segment: {:#?}", segment);
@@ -369,9 +383,9 @@ struct Like {
 #[cfg(test)]
 mod tests {
     // cmk use prettyplease::unparse;
-    use crate::{transform_fn, UuidGenerator};
+    use crate::{transform_fn, Struct1, UuidGenerator};
     use prettyplease::unparse;
-    use syn::{parse_quote, parse_str, File, Item, ItemFn, Type};
+    use syn::{fold::Fold, parse_quote, parse_str, File, Item, ItemFn, Type};
 
     fn str_to_type(s: &str) -> Type {
         parse_str(s).unwrap()
@@ -650,5 +664,17 @@ mod tests {
             Ok(sum_count)
         }
         assert_eq!(any_count_vec(vec!["a/b", "d"]).unwrap(), 3);
+    }
+
+    #[test]
+    fn fold_one_path() {
+        let before = parse_quote! {
+        pub fn any_count_path(p: PathLike) -> Result<usize, anyhow::Error> {
+            let count = p.iter().count();
+            Ok(count)
+        }        };
+        let mut struct1 = Struct1 {};
+        let result = struct1.fold_item_fn(before);
+        println!("result: {:#?}", result);
     }
 }
