@@ -255,19 +255,17 @@ fn process_type(
 
         // If Like<something> is found,
         //      process something, returning the perhaps new subtype (any maybe new generics),
-        // define our own generic type, S0, and add it to the list of generics
-        // if at the type-level, define the new stmt.
+        let (sub_type, sub_generic_params) = process_any_subtype(segment, likes, generic_gen);
 
-        let (sub_type, mut generic_params) = process_any_subtype(segment, likes, generic_gen);
-
-        // cmk why does the like_to_generic_param function need a move input?
+        // define our own generic type -- for example S0 -- and add it to the list of generics
         let new_type = generic_gen.next().unwrap();
-        generic_params.push((like.like_to_generic_param)(&new_type, sub_type.as_ref()));
+        // cmk why does the like_to_generic_param function need a move input?
+        let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
 
         DeltaType {
             like: Some(like),
             new_type,
-            generic_params,
+            generic_params: [sub_generic_params, vec![generic_param]].concat(),
         }
     } else {
         DeltaType {
