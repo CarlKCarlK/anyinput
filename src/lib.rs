@@ -196,13 +196,12 @@ fn process_fn_arg(
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
         let delta_type = process_type(&*pat_type.ty, likes, generic_gen);
+
         let new_fn_arg = FnArg::Typed(PatType {
             ty: Box::new(delta_type.new_type.clone()),
             ..pat_type.clone()
         });
-
         let stmts = generate_any_stmts(&delta_type, pat_ident);
-
         DeltaFnArg {
             fn_arg: new_fn_arg,
             generic_params: delta_type.generic_params,
