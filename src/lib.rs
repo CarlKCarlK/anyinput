@@ -385,7 +385,13 @@ fn process_any_subtype(
     generic_gen: &mut impl Iterator<Item = Type>,
 ) -> Option<DeltaType> {
     if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
-        let delta_type = process_type(&sub_type_inner, likes, generic_gen);
+        // let delta_type = process_type(&sub_type_inner, likes, generic_gen);
+        let delta_type = DeltaType {
+            like: None,
+            new_type: sub_type_inner.clone(),
+            generic_params: vec![],
+        };
+
         Some(delta_type)
     } else {
         None
