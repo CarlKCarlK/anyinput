@@ -307,25 +307,25 @@ struct Struct1<'a> {
 
 impl Fold for Struct1<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
-        println!("fold_type_path: {:?}", quote!(#type_path));
+        println!("fold_type_path (before): {:?}", quote!(#type_path));
 
-        // Search for any special (sub...) subtypes, replacing them with generics.
+        // Search for any special (sub)subtypes, replacing them with generics.
         let mut type_path = fold_type_path(self, type_path);
 
-        // cmk rename 'special' to 'special'
-
-        // If this type is special, replace it with a generic.
+        // If this top-level type is special, replace it with a generic.
         if let Some((segment, special)) = is_special_type_path(&type_path, &self.specials) {
-            self.last_special = Some(special.clone()); // remember which special found
-            type_path = self.generic_gen.next().unwrap();
+            self.last_special = Some(special.clone()); // remember which kind of special found
 
+            type_path = self.generic_gen.next().unwrap(); // Generate the generic type, e.g. S23
+
+            // Define the generic type, e.g. S23: AsRef<str>, and remember it.
             let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
             let generic_param = (special.special_to_generic_param)(&type_path, sub_type.as_ref());
             self.generic_params.push(generic_param);
         } else {
             self.last_special = None;
         }
-        println!("fold_type_path: {}", quote!(#type_path));
+        println!("fold_type_path (after): {}", quote!(#type_path));
         type_path
     }
 }
