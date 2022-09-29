@@ -313,16 +313,15 @@ impl Fold for Struct1<'_> {
         let mut type_path = fold_type_path(self, type_path);
 
         // cmk rename 'like' to 'special'
+
         // If this type is special, replace it with a generic.
         if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
-            self.last_like = Some(like.clone());
-            let sub_type = has_sub_type(segment.arguments);
-            // define our own generic type -- for example S0 -- and add it to the list of generics
+            self.last_like = Some(like.clone()); // remember which special found
             type_path = self.generic_gen.next().unwrap();
-            // cmk why does the like_to_generic_param function need a move input?
+
+            let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
             let generic_param = (like.like_to_generic_param)(&type_path, sub_type.as_ref());
             self.generic_params.push(generic_param);
-            // cmk remember like and figure out if it is top-level or not
         } else {
             self.last_like = None;
         }
@@ -405,15 +404,6 @@ mod tests {
     fn str_to_type_path(s: &str) -> TypePath {
         parse_str(s).unwrap()
     }
-
-    // fn item_fn_to_string(item_fn: &ItemFn) -> String {
-    //     let old_file = parse_str::<File>("").expect("doesn't parse"); // todo is there a File::new?
-    //     let new_file = File {
-    //         items: vec![Item::Fn(item_fn.clone())],
-    //         ..old_file
-    //     };
-    //     unparse(&new_file)
-    // }
 
     fn generic_gen_test_factory() -> impl Iterator<Item = TypePath> + 'static {
         (0usize..)
