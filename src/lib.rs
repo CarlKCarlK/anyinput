@@ -90,13 +90,13 @@ impl Special {
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
-    let (new_inputs, generic_params, stmts) = transform_inputs(&old_fn.sig.inputs, generic_gen);
+    let delta_fun_args = transform_inputs(&old_fn.sig.inputs, generic_gen);
 
     // For each special input found, add a new generic definition, for example, 'S0 : AsRef<str>'
-    let new_params = transform_generics(&old_fn.sig.generics.params, generic_params);
+    let new_params = transform_generics(&old_fn.sig.generics.params, delta_fun_args.generic_params);
 
     // For each special input found, add a statement(s) defining a new local variable. For example, 'let s = s.as_ref();'
-    let new_stmts = transform_stmts(&old_fn.block.stmts, stmts);
+    let new_stmts = transform_stmts(&old_fn.block.stmts, delta_fun_args.stmts);
 
     // Create a new function with the transformed inputs, generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
@@ -110,7 +110,7 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypeP
                 params: new_params,
                 ..old_fn.sig.generics.clone()
             },
-            inputs: new_inputs,
+            inputs: delta_fun_args.fn_args,
             ..old_fn.sig.clone()
         },
         block: Box::new(Block {
@@ -169,25 +169,41 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
-) -> (Punctuated<FnArg, Comma>, Vec<GenericParam>, Vec<Stmt>) {
+) -> DeltaFnArgs {
     // For each old input, create a new input, transforming the types if they are special.
-    let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
 
-    // Remember the names and types of the special inputs.
-    let mut generic_params: Vec<GenericParam> = vec![];
-    let mut stmts: Vec<Stmt> = vec![];
-
-    for old_fn_arg in old_inputs {
-        let delta_fn_arg = process_fn_arg(old_fn_arg, generic_gen);
-        stmts = [stmts, delta_fn_arg.stmts].concat();
-        generic_params = [generic_params, delta_fn_arg.generic_params].concat();
-        new_fn_args.push(delta_fn_arg.fn_arg);
-        // see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
-        // todo: Do these struct contains Box to make them easier to modify?
-        // The box pattern syntax is experimental and can't use used in stable Rust.
-    }
-    (new_fn_args, generic_params, stmts)
+    old_inputs
+        .iter()
+        .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
+        .fold(DeltaFnArgs::new(), |mut delta_fun_args, delta_fun_arg| {
+            delta_fun_args.push(delta_fun_arg);
+            delta_fun_args
+        })
 }
+
+struct DeltaFnArgs {
+    fn_args: Punctuated<FnArg, Comma>,
+    generic_params: Vec<GenericParam>,
+    stmts: Vec<Stmt>,
+}
+
+impl DeltaFnArgs {
+    fn new() -> Self {
+        Self {
+            fn_args: Punctuated::<FnArg, Comma>::new(),
+            generic_params: vec![],
+            stmts: vec![],
+        }
+    }
+
+    fn push(&mut self, delta_fn_arg: DeltaFnArg) {
+        self.fn_args.push(delta_fn_arg.fn_arg);
+        self.generic_params.extend(delta_fn_arg.generic_params);
+        self.stmts.extend(delta_fn_arg.stmts);
+    }
+}
+
+// cmk see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
 
 #[derive(Debug)]
 // the new function input, any statements to add, and any new generic definitions.
