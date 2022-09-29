@@ -6,7 +6,7 @@
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 // https://docs.rs/syn/latest/syn/fold/index.html#example
-// cmk what about Vec<StringSpecial>?
+// cmk what about Vec<StringLike>?
 // cmk add nd::array view
 // cmk make nd support an optional feature
 
@@ -76,22 +76,22 @@ fn array_2(name: Ident) -> Stmt {
 fn to_specials() -> Vec<Special> {
     vec![
         Special {
-            special: Ident::new("IterSpecial", proc_macro2::Span::call_site()),
+            special: Ident::new("IterLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &iter_1,
             ident_to_stmt: &iter_2,
         },
         Special {
-            special: Ident::new("ArraySpecial", proc_macro2::Span::call_site()),
+            special: Ident::new("ArrayLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &array_1,
             ident_to_stmt: &array_2,
         },
         Special {
-            special: Ident::new("StringSpecial", proc_macro2::Span::call_site()),
+            special: Ident::new("StringLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &string_1,
             ident_to_stmt: &string_2,
         },
         Special {
-            special: Ident::new("PathSpecial", proc_macro2::Span::call_site()),
+            special: Ident::new("PathLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &path_1,
             ident_to_stmt: &path_2,
         },
@@ -101,7 +101,7 @@ fn to_specials() -> Vec<Special> {
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
     let specials = to_specials();
 
-    // Check that function for special inputs such as 's: StringSpecial'. If found, replace with generics such as 's: S0' and remember.
+    // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, generic_params, stmts) =
         transform_inputs(&old_fn.sig.inputs, generic_gen, specials);
 
@@ -168,17 +168,17 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     }
 }
 
-// Look for special inputs such as 's: StringSpecial'. If found, replace with generics special 's: S0'.
-// Todo support: PathSpecial, IterSpecial<T>, ArraySpecial<T> (including ArraySpecial<PathSpecial>), NdArraySpecial<T>, etc.
+// Look for special inputs such as 's: StringLike'. If found, replace with generics special 's: S0'.
+// Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArraySpecial<T>, etc.
 
 // for each input, if it is top-level special, replace it with generic(s) and remember the generic(s) and the top-level variable.
 // v: i32 -> v: i32, <>, {}
-// v: StringSpecial -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
-// v: IterSpecial<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: IterSpecial<StringSpecial> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
-// v: IterSpecial<IterSpecial<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: IterSpecial<IterSpecial<StringSpecial>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
-// v: [StringSpecial] -> v: [S0], <S0: AsRef<str>>, {}
+// v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
+// v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
+// v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
+// v: [StringLike] -> v: [S0], <S0: AsRef<str>>, {}
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
@@ -218,7 +218,7 @@ fn process_fn_arg(
     // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
     // the type is 'Path' (so not, for example, a macro)
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
-        // the one and only item in path is, for example, 'StringSpecial'
+        // the one and only item in path is, for example, 'StringLike'
         let delta_type = process_type(&*pat_type.ty, specials, generic_gen);
 
         let new_fn_arg = FnArg::Typed(PatType {
@@ -277,7 +277,7 @@ fn process_type(
     specials: &Vec<Special>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaType {
-    // a: IterSpecial<Vec<SomeWeird<i32,PathSpecial>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
+    // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
     // Search type and its subtypes for special types starting at the deepest level.
     // When one is found, replace it with a generic.
     // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
@@ -337,7 +337,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
             println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
-                // cmk IterSpecial<PathSpecial>
+                // cmk IterLike<PathLike>
                 Some(sub_type2.clone())
             } else {
                 panic!("expected GenericArgument::Type cmk");
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn one_input() {
         let before = parse_quote! {
-        pub fn any_str_len1(s: StringSpecial) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }        };
@@ -459,7 +459,7 @@ mod tests {
     #[test]
     fn two_inputs() {
         let before = parse_quote! {
-        pub fn any_str_len2(a: StringSpecial, b: StringSpecial) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len2(a: StringLike, b: StringLike) -> Result<usize, anyhow::Error> {
             let len = a.len() + b.len();
             Ok(len)
         }};
@@ -495,7 +495,7 @@ mod tests {
     #[test]
     fn one_plus_two_input() {
         let before = parse_quote! {
-        pub fn any_str_len1plus2(a: usize, s: StringSpecial, b: usize) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1plus2(a: usize, s: StringLike, b: usize) -> Result<usize, anyhow::Error> {
             let len = s.len()+a+b;
             Ok(len)
         }};
@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn one_input_uuid() {
-        let before = parse_quote! {pub fn any_str_len1(s: StringSpecial) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }};
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn one_path_input() {
         let before = parse_quote! {
-        pub fn any_count_path(p: PathSpecial) -> Result<usize, anyhow::Error> {
+        pub fn any_count_path(p: PathLike) -> Result<usize, anyhow::Error> {
             let count = p.iter().count();
             Ok(count)
         }        };
@@ -540,7 +540,7 @@ mod tests {
     #[test]
     fn one_iter_usize_input() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterSpecial<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: IterLike<usize>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -567,7 +567,7 @@ mod tests {
     #[test]
     fn one_iter_i32() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterSpecial<i32>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: IterLike<i32>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -592,7 +592,7 @@ mod tests {
     #[test]
     fn one_iter_t() {
         let before = parse_quote! {
-        pub fn any_count_iter<T>(i: IterSpecial<T>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter<T>(i: IterLike<T>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -619,7 +619,7 @@ mod tests {
     #[test]
     fn one_iter_path() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterSpecial<PathSpecial>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: IterLike<PathLike>) -> Result<usize, anyhow::Error> {
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }        };
@@ -649,7 +649,7 @@ mod tests {
     fn one_vec_path() {
         let before = parse_quote! {
         pub fn any_count_vec(
-            i: Vec<PathSpecial>,
+            i: Vec<PathLike>,
         ) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
@@ -679,7 +679,7 @@ mod tests {
         // cmk 9 rules: parse_quote!
         // cmk 9 rules: use format!(quote!()) to generate strings of code
         // cmk 9 rules quote! is a nice way to display short ASTs on one line, too
-        let before = parse_quote! {IterSpecial<PathSpecial> };
+        let before = parse_quote! {IterLike<PathLike> };
         println!("before: {}", quote!(before));
         let mut gen = generic_gen_test_factory();
         let mut struct1 = Struct1 {
@@ -707,7 +707,7 @@ mod tests {
     #[test]
     fn one_array_usize_input() {
         let before = parse_quote! {
-        pub fn any_slice_len(a: ArraySpecial<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_slice_len(a: ArrayLike<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }        };
