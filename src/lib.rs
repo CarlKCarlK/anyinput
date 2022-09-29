@@ -205,10 +205,10 @@ fn process_fn_arg(
     // the type is 'Path' (so not, for example, a macro)
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        let delta_type = process_type(&*pat_type.ty, generic_gen);
+        let (delta_type, new_type) = process_type(&*pat_type.ty, generic_gen);
 
         let new_fn_arg = FnArg::Typed(PatType {
-            ty: Box::new(delta_type.new_type.clone()),
+            ty: Box::new(new_type.clone()),
             ..pat_type.clone()
         });
 
@@ -228,8 +228,8 @@ fn process_fn_arg(
     }
 }
 
-fn generate_any_stmts(delta_type: &DeltaType, pat_ident: &PatIdent) -> Vec<Stmt> {
-    if let Some(special) = &delta_type.special {
+fn generate_any_stmts(delta_type: &Struct1, pat_ident: &PatIdent) -> Vec<Stmt> {
+    if let Some(special) = &delta_type.last_special {
         let name = pat_ident.ident.clone(); // cmk too many clones
         vec![special.ident_to_stmt(name)]
     } else {
@@ -248,17 +248,12 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
     None
 }
 
-// cmk if this is going to stick around should be Debug
-struct DeltaType {
-    new_type: Type,
-    special: Option<Special>,
-    generic_params: Vec<GenericParam>,
-}
-
-// cmk move the Specials data structure elsewhere
 // cmk can/should DeltaType and Struct1 be combined?
 #[allow(clippy::ptr_arg)]
-fn process_type(ty: &Type, generic_gen: &mut impl Iterator<Item = TypePath>) -> DeltaType {
+fn process_type<'a>(
+    ty: &'a Type,
+    generic_gen: &'a mut impl Iterator<Item = TypePath>,
+) -> (Struct1<'a>, Type) {
     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
     // Search type and its subtypes for special types starting at the deepest level.
     // When one is found, replace it with a generic.
@@ -271,11 +266,13 @@ fn process_type(ty: &Type, generic_gen: &mut impl Iterator<Item = TypePath>) -> 
     };
     let new_type = struct1.fold_type(ty.clone()); // cmk too many clones
 
-    DeltaType {
-        special: struct1.last_special,
-        new_type,
-        generic_params: struct1.generic_params,
-    }
+    // DeltaType {
+    //     special: struct1.last_special,
+    //     new_type,
+    //     generic_params: struct1.generic_params,
+    // }
+
+    (struct1, new_type)
 }
 
 struct Struct1<'a> {
@@ -283,6 +280,13 @@ struct Struct1<'a> {
     generic_params: Vec<GenericParam>,
     generic_gen: &'a mut dyn Iterator<Item = TypePath>,
     last_special: Option<Special>,
+}
+
+#[derive(Debug)]
+struct DeltaType_cmk {
+    new_type: Type,
+    special: Option<Special>,
+    generic_params: Vec<GenericParam>,
 }
 
 impl Fold for Struct1<'_> {
