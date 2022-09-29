@@ -19,7 +19,7 @@ use syn::fold::{fold_type_path, Fold};
 // todo don't use private
 use syn::{
     parse_macro_input, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
-    GenericArgument, GenericParam, Generics, Ident, ItemFn, Pat, PatIdent, PatType, PathArguments,
+    GenericArgument, GenericParam, Generics, ItemFn, Pat, PatIdent, PatType, PathArguments,
     PathSegment, Signature, Stmt, Type, TypePath,
 };
 use uuid::Uuid;
@@ -71,16 +71,15 @@ impl Special {
         }
     }
 
-    fn ident_to_stmt(&self, name: Ident) -> Stmt {
+    fn pat_ident_to_stmt(&self, pat_ident: &PatIdent) -> Stmt {
+        let name = &pat_ident.ident;
         match &self {
             Special::ArrayLike | Special::StringLike | Special::PathLike => {
-                let name = name;
                 parse_quote! {
                     let #name = #name.as_ref();
                 }
             }
             Special::IterLike => {
-                let name = name;
                 parse_quote! {
                     let #name = #name.into_iter();
                 }
@@ -212,8 +211,7 @@ fn process_fn_arg(
             ..pat_type.clone()
         });
 
-        // cmk inline this OR generate statements as early as possible
-        let stmts = generate_any_stmts(&delta_type, pat_ident);
+        let stmts = delta_type.generate_any_stmts(pat_ident);
         DeltaFnArg {
             fn_arg: new_fn_arg,
             generic_params: delta_type.generic_params,
@@ -228,12 +226,13 @@ fn process_fn_arg(
     }
 }
 
-fn generate_any_stmts(delta_type: &DeltaType, pat_ident: &PatIdent) -> Vec<Stmt> {
-    if let Some(special) = &delta_type.last_special {
-        let name = pat_ident.ident.clone(); // cmk too many clones
-        vec![special.ident_to_stmt(name)]
-    } else {
-        vec![]
+impl DeltaType<'_> {
+    fn generate_any_stmts(&self, pat_ident: &PatIdent) -> Vec<Stmt> {
+        if let Some(special) = &self.last_special {
+            vec![special.pat_ident_to_stmt(pat_ident)]
+        } else {
+            vec![]
+        }
     }
 }
 
