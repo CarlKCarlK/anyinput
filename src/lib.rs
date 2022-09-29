@@ -1,4 +1,4 @@
-// todo rename to input-like-derive (or derive-input-like)
+// todo rename to input-special-derive (or derive-input-special)
 // todo remove cargo stuff features of syn no longer needed.
 // todo use AST spans test so that problems with the user's syntax are reported correctly
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
@@ -6,7 +6,7 @@
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 // https://docs.rs/syn/latest/syn/fold/index.html#example
-// cmk what about Vec<StringLike>?
+// cmk what about Vec<StringSpecial>?
 // cmk add nd::array view
 // cmk make nd support an optional feature
 
@@ -22,7 +22,7 @@ use syn::{
 use uuid::Uuid;
 
 // #[proc_macro_attribute]
-pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
     // panic!("input: {:#?}", &input);
 
     let old_item_fn = parse_macro_input!(input as ItemFn);
@@ -73,37 +73,37 @@ fn array_2(name: Ident) -> Stmt {
 // cmk use Traits
 // cmk use a Hash table
 
-fn to_likes() -> Vec<Like> {
+fn to_specials() -> Vec<Special> {
     vec![
-        Like {
-            special: Ident::new("IterLike", proc_macro2::Span::call_site()),
-            like_to_generic_param: &iter_1,
+        Special {
+            special: Ident::new("IterSpecial", proc_macro2::Span::call_site()),
+            special_to_generic_param: &iter_1,
             ident_to_stmt: &iter_2,
         },
-        Like {
-            special: Ident::new("ArrayLike", proc_macro2::Span::call_site()),
-            like_to_generic_param: &array_1,
+        Special {
+            special: Ident::new("ArraySpecial", proc_macro2::Span::call_site()),
+            special_to_generic_param: &array_1,
             ident_to_stmt: &array_2,
         },
-        Like {
-            special: Ident::new("StringLike", proc_macro2::Span::call_site()),
-            like_to_generic_param: &string_1,
+        Special {
+            special: Ident::new("StringSpecial", proc_macro2::Span::call_site()),
+            special_to_generic_param: &string_1,
             ident_to_stmt: &string_2,
         },
-        Like {
-            special: Ident::new("PathLike", proc_macro2::Span::call_site()),
-            like_to_generic_param: &path_1,
+        Special {
+            special: Ident::new("PathSpecial", proc_macro2::Span::call_site()),
+            special_to_generic_param: &path_1,
             ident_to_stmt: &path_2,
         },
     ]
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
-    let likes = to_likes();
+    let specials = to_specials();
 
-    // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
+    // Check that function for special inputs such as 's: StringSpecial'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, generic_params, stmts) =
-        transform_inputs(&old_fn.sig.inputs, generic_gen, likes);
+        transform_inputs(&old_fn.sig.inputs, generic_gen, specials);
 
     // For each special input found, define a new generic, for example, 'S0 : AsRef<str>'
     let new_generics = transform_generics(&old_fn.sig.generics.params, generic_params);
@@ -168,21 +168,21 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     }
 }
 
-// Look for special inputs such as 's: StringLike'. If found, replace with generics like 's: S0'.
-// Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArrayLike<T>, etc.
+// Look for special inputs such as 's: StringSpecial'. If found, replace with generics special 's: S0'.
+// Todo support: PathSpecial, IterSpecial<T>, ArraySpecial<T> (including ArraySpecial<PathSpecial>), NdArraySpecial<T>, etc.
 
 // for each input, if it is top-level special, replace it with generic(s) and remember the generic(s) and the top-level variable.
 // v: i32 -> v: i32, <>, {}
-// v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
-// v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
-// v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
-// v: [StringLike] -> v: [S0], <S0: AsRef<str>>, {}
+// v: StringSpecial -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
+// v: IterSpecial<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: IterSpecial<StringSpecial> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
+// v: IterSpecial<IterSpecial<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: IterSpecial<IterSpecial<StringSpecial>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
+// v: [StringSpecial] -> v: [S0], <S0: AsRef<str>>, {}
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
-    likes: Vec<Like>,
+    specials: Vec<Special>,
 ) -> (Punctuated<FnArg, Comma>, Vec<GenericParam>, Vec<Stmt>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
@@ -191,7 +191,7 @@ fn transform_inputs(
     let mut stmts: Vec<Stmt> = vec![];
 
     for old_fn_arg in old_inputs {
-        let delta_fn_arg = process_fn_arg(old_fn_arg, &likes, generic_gen);
+        let delta_fn_arg = process_fn_arg(old_fn_arg, &specials, generic_gen);
         stmts = [stmts, delta_fn_arg.stmts].concat();
         generic_params = [generic_params, delta_fn_arg.generic_params].concat();
         new_fn_args.push(delta_fn_arg.fn_arg);
@@ -211,15 +211,15 @@ struct DeltaFnArg {
 
 fn process_fn_arg(
     old_fn_arg: &FnArg,
-    likes: &Vec<Like>,
+    specials: &Vec<Special>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaFnArg {
     // If the input is 'Typed' (so not self), and
     // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
     // the type is 'Path' (so not, for example, a macro)
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
-        // the one and only item in path is, for example, 'StringLike'
-        let delta_type = process_type(&*pat_type.ty, likes, generic_gen);
+        // the one and only item in path is, for example, 'StringSpecial'
+        let delta_type = process_type(&*pat_type.ty, specials, generic_gen);
 
         let new_fn_arg = FnArg::Typed(PatType {
             ty: Box::new(delta_type.new_type.clone()),
@@ -243,9 +243,9 @@ fn process_fn_arg(
 }
 
 fn generate_any_stmts(delta_type: &DeltaType, pat_ident: &PatIdent) -> Vec<Stmt> {
-    if let Some(like) = &delta_type.like {
+    if let Some(special) = &delta_type.special {
         let name = pat_ident.ident.clone(); // cmk too many clones
-        vec![(like.ident_to_stmt)(name)]
+        vec![(special.ident_to_stmt)(name)]
     } else {
         vec![]
     }
@@ -265,33 +265,33 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 // cmk if this is going to stick around should be Debug
 struct DeltaType {
     new_type: Type,
-    like: Option<Like>,
+    special: Option<Special>,
     generic_params: Vec<GenericParam>,
 }
 
-// cmk move the Likes data structure elsewhere
+// cmk move the Specials data structure elsewhere
 // cmk can/should DeltaType and Struct1 be combined?
 #[allow(clippy::ptr_arg)]
 fn process_type(
     ty: &Type,
-    likes: &Vec<Like>,
+    specials: &Vec<Special>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaType {
-    // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
+    // a: IterSpecial<Vec<SomeWeird<i32,PathSpecial>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
     // Search type and its subtypes for special types starting at the deepest level.
     // When one is found, replace it with a generic.
     // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
 
     let mut struct1 = Struct1 {
-        likes: likes.clone(), // cmk too many clones
+        specials: specials.clone(), // cmk too many clones
         generic_params: vec![],
         generic_gen,
-        last_like: None,
+        last_special: None,
     };
     let new_type = struct1.fold_type(ty.clone()); // cmk too many clones
 
     DeltaType {
-        like: struct1.last_like,
+        special: struct1.last_special,
         new_type,
         generic_params: struct1.generic_params,
     }
@@ -299,10 +299,10 @@ fn process_type(
 
 struct Struct1<'a> {
     // cmk rename
-    likes: Vec<Like>,
+    specials: Vec<Special>,
     generic_params: Vec<GenericParam>,
     generic_gen: &'a mut dyn Iterator<Item = TypePath>,
-    last_like: Option<Like>,
+    last_special: Option<Special>,
 }
 
 impl Fold for Struct1<'_> {
@@ -312,18 +312,18 @@ impl Fold for Struct1<'_> {
         // Search for any special (sub...) subtypes, replacing them with generics.
         let mut type_path = fold_type_path(self, type_path);
 
-        // cmk rename 'like' to 'special'
+        // cmk rename 'special' to 'special'
 
         // If this type is special, replace it with a generic.
-        if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
-            self.last_like = Some(like.clone()); // remember which special found
+        if let Some((segment, special)) = is_special_type_path(&type_path, &self.specials) {
+            self.last_special = Some(special.clone()); // remember which special found
             type_path = self.generic_gen.next().unwrap();
 
             let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
-            let generic_param = (like.like_to_generic_param)(&type_path, sub_type.as_ref());
+            let generic_param = (special.special_to_generic_param)(&type_path, sub_type.as_ref());
             self.generic_params.push(generic_param);
         } else {
-            self.last_like = None;
+            self.last_special = None;
         }
         println!("fold_type_path: {}", quote!(#type_path));
         type_path
@@ -337,7 +337,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
             println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
-                // cmk IterLike<PathLike>
+                // cmk IterSpecial<PathSpecial>
                 Some(sub_type2.clone())
             } else {
                 panic!("expected GenericArgument::Type cmk");
@@ -349,14 +349,17 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
     }
 }
 
-fn is_special_type_path(type_path: &TypePath, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
+fn is_special_type_path(
+    type_path: &TypePath,
+    specials: &Vec<Special>,
+) -> Option<(PathSegment, Special)> {
     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
         // print!("segment: {:#?}", segment);
-        for like in likes {
-            // print!("{:#?}=={:#?} ", segment.ident, like.special);
-            if segment.ident == like.special {
+        for special in specials {
+            // print!("{:#?}=={:#?} ", segment.ident, special.special);
+            if segment.ident == special.special {
                 // Create a new input with a generic type and remember the name and type.
-                return Some((segment.clone(), like.clone())); // todo review all clones
+                return Some((segment.clone(), special.clone())); // todo review all clones
             }
         }
     }
@@ -387,16 +390,16 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
 }
 
 #[derive(Clone)]
-struct Like {
+struct Special {
     special: Ident,
-    like_to_generic_param: &'static dyn Fn(&TypePath, Option<&Type>) -> GenericParam,
+    special_to_generic_param: &'static dyn Fn(&TypePath, Option<&Type>) -> GenericParam,
     ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
 
 #[cfg(test)]
 mod tests {
     // cmk use prettyplease::unparse;
-    use crate::{to_likes, transform_fn, Struct1, UuidGenerator};
+    use crate::{to_specials, transform_fn, Struct1, UuidGenerator};
     // cmk remove from cargo use prettyplease::unparse;
     use quote::quote;
     use syn::{fold::Fold, parse_quote, parse_str, ItemFn, TypePath};
@@ -438,7 +441,7 @@ mod tests {
     #[test]
     fn one_input() {
         let before = parse_quote! {
-        pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1(s: StringSpecial) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }        };
@@ -456,7 +459,7 @@ mod tests {
     #[test]
     fn two_inputs() {
         let before = parse_quote! {
-        pub fn any_str_len2(a: StringLike, b: StringLike) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len2(a: StringSpecial, b: StringSpecial) -> Result<usize, anyhow::Error> {
             let len = a.len() + b.len();
             Ok(len)
         }};
@@ -492,7 +495,7 @@ mod tests {
     #[test]
     fn one_plus_two_input() {
         let before = parse_quote! {
-        pub fn any_str_len1plus2(a: usize, s: StringLike, b: usize) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1plus2(a: usize, s: StringSpecial, b: usize) -> Result<usize, anyhow::Error> {
             let len = s.len()+a+b;
             Ok(len)
         }};
@@ -509,7 +512,7 @@ mod tests {
 
     #[test]
     fn one_input_uuid() {
-        let before = parse_quote! {pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {pub fn any_str_len1(s: StringSpecial) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }};
@@ -519,7 +522,7 @@ mod tests {
     #[test]
     fn one_path_input() {
         let before = parse_quote! {
-        pub fn any_count_path(p: PathLike) -> Result<usize, anyhow::Error> {
+        pub fn any_count_path(p: PathSpecial) -> Result<usize, anyhow::Error> {
             let count = p.iter().count();
             Ok(count)
         }        };
@@ -537,7 +540,7 @@ mod tests {
     #[test]
     fn one_iter_usize_input() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: IterSpecial<usize>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -564,7 +567,7 @@ mod tests {
     #[test]
     fn one_iter_i32() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterLike<i32>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: IterSpecial<i32>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -589,7 +592,7 @@ mod tests {
     #[test]
     fn one_iter_t() {
         let before = parse_quote! {
-        pub fn any_count_iter<T>(i: IterLike<T>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter<T>(i: IterSpecial<T>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -616,7 +619,7 @@ mod tests {
     #[test]
     fn one_iter_path() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterLike<PathLike>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: IterSpecial<PathSpecial>) -> Result<usize, anyhow::Error> {
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }        };
@@ -646,7 +649,7 @@ mod tests {
     fn one_vec_path() {
         let before = parse_quote! {
         pub fn any_count_vec(
-            i: Vec<PathLike>,
+            i: Vec<PathSpecial>,
         ) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
@@ -676,14 +679,14 @@ mod tests {
         // cmk 9 rules: parse_quote!
         // cmk 9 rules: use format!(quote!()) to generate strings of code
         // cmk 9 rules quote! is a nice way to display short ASTs on one line, too
-        let before = parse_quote! {IterLike<PathLike> };
+        let before = parse_quote! {IterSpecial<PathSpecial> };
         println!("before: {}", quote!(before));
         let mut gen = generic_gen_test_factory();
         let mut struct1 = Struct1 {
-            likes: to_likes(),
+            specials: to_specials(),
             generic_params: vec![],
             generic_gen: &mut gen,
-            last_like: None,
+            last_special: None,
         };
         let result = struct1.fold_type(before);
         for generic_param in struct1.generic_params {
@@ -691,9 +694,9 @@ mod tests {
         }
 
         println!(
-            "struct1.last_like.ident: {:#?}",
-            if struct1.last_like.is_some() {
-                struct1.last_like.as_ref().unwrap().special.to_string()
+            "struct1.last_special.ident: {:#?}",
+            if struct1.last_special.is_some() {
+                struct1.last_special.as_ref().unwrap().special.to_string()
             } else {
                 "None".to_string()
             }
@@ -704,7 +707,7 @@ mod tests {
     #[test]
     fn one_array_usize_input() {
         let before = parse_quote! {
-        pub fn any_slice_len(a: ArrayLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_slice_len(a: ArraySpecial<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }        };
