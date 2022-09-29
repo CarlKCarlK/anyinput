@@ -7,7 +7,7 @@
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 // https://docs.rs/syn/latest/syn/fold/index.html#example
 // cmk what about Vec<StringLike>?
-// cmk add nd::arrayview
+// cmk add nd::array view
 // cmk make nd support an optional feature
 
 use quote::quote;
@@ -269,7 +269,7 @@ struct DeltaType {
     generic_params: Vec<GenericParam>,
 }
 
-// cmk move the Likes datastructure elsewhere
+// cmk move the Likes data structure elsewhere
 // cmk can/should DeltaType and Struct1 be combined?
 #[allow(clippy::ptr_arg)]
 fn process_type(
@@ -316,7 +316,7 @@ impl Fold for Struct1<'_> {
         // If this type is special, replace it with a generic.
         if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
             self.last_like = Some(like.clone());
-            let delta_type = process_any_subtype(segment, &self.likes, &mut self.generic_gen);
+            let delta_type = process_any_subtype(segment);
 
             let sub_type: Option<Type>;
             if let Some(delta_type) = delta_type {
@@ -379,16 +379,12 @@ impl Fold for Struct1<'_> {
 //     }
 // }
 
-fn process_any_subtype(
-    segment: PathSegment,
-    likes: &Vec<Like>,
-    generic_gen: &mut impl Iterator<Item = Type>,
-) -> Option<DeltaType> {
+fn process_any_subtype(segment: PathSegment) -> Option<DeltaType> {
     if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
         // let delta_type = process_type(&sub_type_inner, likes, generic_gen);
         let delta_type = DeltaType {
             like: None,
-            new_type: sub_type_inner.clone(),
+            new_type: sub_type_inner,
             generic_params: vec![],
         };
 
