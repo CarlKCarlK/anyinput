@@ -316,15 +316,7 @@ impl Fold for Struct1<'_> {
         // If this type is special, replace it with a generic.
         if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
             self.last_like = Some(like.clone());
-            let delta_type = process_any_subtype(segment);
-
-            let sub_type: Option<Type>;
-            if let Some(delta_type) = delta_type {
-                sub_type = Some(delta_type.new_type);
-            } else {
-                sub_type = None;
-            }
-
+            let sub_type = has_sub_type(segment.arguments);
             // define our own generic type -- for example S0 -- and add it to the list of generics
             let new_type = self.generic_gen.next().unwrap();
             if let Type::Path(type_path1) = &new_type {
@@ -341,56 +333,6 @@ impl Fold for Struct1<'_> {
         }
         println!("fold_type_path: {}", quote!(#type_path));
         type_path
-    }
-}
-
-// fn old_process_type(
-//     ty: &Type,
-//     likes: &Vec<Like>,
-//     generic_gen: &mut impl Iterator<Item = Type>,
-// ) -> DeltaType {
-//     if let Some((segment, like)) = is_special_type(ty, likes) {
-//         // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
-//         // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-//         // v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
-//         // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-//         // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
-
-//         // If Like<something> is found,
-//         //      process something, returning the perhaps new subtype (any maybe new generics),
-//         let (sub_type, sub_generic_params) = process_any_subtype(segment, likes, generic_gen);
-
-//         // define our own generic type -- for example S0 -- and add it to the list of generics
-//         let new_type = generic_gen.next().unwrap();
-//         // cmk why does the like_to_generic_param function need a move input?
-//         let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
-
-//         DeltaType {
-//             like: Some(like),
-//             new_type,
-//             generic_params: [sub_generic_params, vec![generic_param]].concat(),
-//         }
-//     } else {
-//         DeltaType {
-//             like: None,
-//             new_type: ty.clone(),
-//             generic_params: vec![],
-//         }
-//     }
-// }
-
-fn process_any_subtype(segment: PathSegment) -> Option<DeltaType> {
-    if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
-        // let delta_type = process_type(&sub_type_inner, likes, generic_gen);
-        let delta_type = DeltaType {
-            like: None,
-            new_type: sub_type_inner,
-            generic_params: vec![],
-        };
-
-        Some(delta_type)
-    } else {
-        None
     }
 }
 
