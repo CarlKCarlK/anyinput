@@ -263,13 +263,31 @@ struct DeltaType {
 struct Struct1 {
     // cmk rename
     likes: Vec<Like>,
+    generic_params: Vec<GenericParam>,
+    generic_gen: UuidGenerator,
 }
 
 impl Fold for Struct1 {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
         let mut type_path = fold_type_path(self, type_path);
         if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
-            // cmk
+            // StringLike -> S0, S0: AsRef<str>
+            // or IterLike<something>
+
+            // If Like<something> is found,
+            //      process something, returning the perhaps new subtype (any maybe new generics),
+            let (sub_type, mut sub_generic_params) =
+                process_any_subtype(segment, &self.likes, &mut self.generic_gen);
+            if sub_type.is_some() {
+                self.generic_params.append(&mut sub_generic_params);
+            }
+
+            // define our own generic type -- for example S0 -- and add it to the list of generics
+            let new_type = self.generic_gen.next().unwrap();
+            // cmk why does the like_to_generic_param function need a move input?
+            let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
+            self.generic_params.push(generic_param);
+            // cmk remember like and figure out if it is top-level or not
         }
         println!("fold_type_path: {}", quote!(#type_path));
         type_path
@@ -317,8 +335,8 @@ fn process_any_subtype(
     generic_gen: &mut impl Iterator<Item = Type>,
 ) -> (Option<Type>, Vec<GenericParam>) {
     if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
-        let sub_delta2 = process_type(&sub_type_inner, likes, generic_gen);
-        (Some(sub_delta2.new_type), sub_delta2.generic_params)
+        let delta_type = process_type(&sub_type_inner, likes, generic_gen);
+        (Some(delta_type.new_type), delta_type.generic_params)
     } else {
         (None, vec![])
     }
@@ -693,7 +711,11 @@ mod tests {
         // cmk 9 rules: use format!(quote!()) to generate strings of code
         let before = parse_quote! {IterLike<PathLike> };
         println!("before: {}", quote!(before));
-        let mut struct1 = Struct1 { likes: to_likes() };
+        let mut struct1 = Struct1 {
+            likes: to_likes(),
+            generic_params: vec![],
+            generic_gen: UuidGenerator::new(),
+        };
         let _result = struct1.fold_type(before);
 
         // println!("result: {:#?}", result);
