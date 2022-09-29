@@ -58,6 +58,16 @@ fn iter_2(name: Ident) -> Stmt {
     }
 }
 
+fn array_1(new_type: &Type, sub_type: Option<&Type>) -> GenericParam {
+    let sub_type = sub_type.expect("array_1: sub_type");
+    parse_quote!(#new_type : AsRef<[#sub_type]>)
+}
+fn array_2(name: Ident) -> Stmt {
+    parse_quote! {
+        let #name = #name.as_ref();
+    }
+}
+
 // cmk use Traits
 // cmk use a Hash table
 
@@ -67,6 +77,11 @@ fn to_likes() -> Vec<Like> {
             special: Ident::new("IterLike", proc_macro2::Span::call_site()),
             like_to_generic_param: &iter_1,
             ident_to_stmt: &iter_2,
+        },
+        Like {
+            special: Ident::new("ArrayLike", proc_macro2::Span::call_site()),
+            like_to_generic_param: &array_1,
+            ident_to_stmt: &array_2,
         },
         Like {
             special: Ident::new("StringLike", proc_macro2::Span::call_site()),
@@ -748,5 +763,30 @@ mod tests {
             }
         );
         println!("result: {}", quote!(#result));
+    }
+
+    #[test]
+    fn one_array_usize_input() {
+        let before = parse_quote! {
+        pub fn any_slice_len(a: ArrayLike<usize>) -> Result<usize, anyhow::Error> {
+            let len = a.len();
+            Ok(len)
+        }        };
+        let expected = parse_quote! {
+        pub fn any_slice_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
+            let a = a.as_ref();
+            let len = a.len();
+            Ok(len)
+        }};
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_item_fn_eq(&after, &expected);
+
+        pub fn any_slice_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
+            let a = a.as_ref();
+            let len = a.len();
+            Ok(len)
+        }
+        assert_eq!(any_slice_len([1, 2, 3]).unwrap(), 3);
     }
 }
