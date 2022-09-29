@@ -249,25 +249,38 @@ struct DeltaType {
     generic_params: Vec<GenericParam>,
 }
 
-// fn process_type_new(
-//     ty: &Type,
-//     likes: &Vec<Like>,
-//     generic_gen: &mut impl Iterator<Item = Type>,
-// ) -> DeltaType {
-//     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
-//     // Search type and its subtypes for special types starting at the deepest level.
-//     // When one is found, replace it with a generic.
-//     // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
-// }
+fn process_type(
+    ty: &Type,
+    likes: &Vec<Like>,
+    generic_gen: &mut impl Iterator<Item = Type>,
+) -> DeltaType {
+    // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
+    // Search type and its subtypes for special types starting at the deepest level.
+    // When one is found, replace it with a generic.
+    // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
 
-struct Struct1 {
+    let mut struct1 = Struct1 {
+        likes: likes.clone(), // cmk too many clones
+        generic_params: vec![],
+        generic_gen: Box::new(generic_gen),
+    };
+    let new_type = struct1.fold_type(ty.clone()); // cmk too many clones
+
+    DeltaType {
+        like: None, //cmk Some(like),
+        new_type,
+        generic_params: struct1.generic_params,
+    }
+}
+
+struct Struct1<'a> {
     // cmk rename
     likes: Vec<Like>,
     generic_params: Vec<GenericParam>,
-    generic_gen: UuidGenerator,
+    generic_gen: Box<&'a mut dyn Iterator<Item = Type>>,
 }
 
-impl Fold for Struct1 {
+impl Fold for Struct1<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
         let mut type_path = fold_type_path(self, type_path);
         if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
@@ -296,7 +309,7 @@ impl Fold for Struct1 {
     }
 }
 
-fn process_type(
+fn old_process_type(
     ty: &Type,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
@@ -713,10 +726,11 @@ mod tests {
         // cmk 9 rules: use format!(quote!()) to generate strings of code
         let before = parse_quote! {IterLike<PathLike> };
         println!("before: {}", quote!(before));
+        let mut gen = UuidGenerator::new();
         let mut struct1 = Struct1 {
             likes: to_likes(),
             generic_params: vec![],
-            generic_gen: UuidGenerator::new(),
+            generic_gen: Box::new(&mut gen),
         };
         let _result = struct1.fold_type(before);
         for generic_param in struct1.generic_params {
