@@ -263,11 +263,12 @@ fn process_type(
         likes: likes.clone(), // cmk too many clones
         generic_params: vec![],
         generic_gen: Box::new(generic_gen),
+        last_like: None,
     };
     let new_type = struct1.fold_type(ty.clone()); // cmk too many clones
 
     DeltaType {
-        like: None, //cmk Some(like),
+        like: struct1.last_like,
         new_type,
         generic_params: struct1.generic_params,
     }
@@ -278,19 +279,28 @@ struct Struct1<'a> {
     likes: Vec<Like>,
     generic_params: Vec<GenericParam>,
     generic_gen: Box<&'a mut dyn Iterator<Item = Type>>,
+    last_like: Option<Like>,
 }
 
 impl Fold for Struct1<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
+        println!("fold_type_path: {:?}", quote!(#type_path));
         let mut type_path = fold_type_path(self, type_path);
         if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
+            self.last_like = Some(like.clone());
             // StringLike -> S0, S0: AsRef<str>
             // or IterLike<something>
 
             // If Like<something> is found,
             //      process something, returning the perhaps new subtype (any maybe new generics),
-            let (sub_type, _sub_generic_params) =
-                process_any_subtype(segment, &self.likes, &mut self.generic_gen);
+            let delta_type = process_any_subtype(segment, &self.likes, &mut self.generic_gen);
+
+            let sub_type: Option<Type>;
+            if let Some(delta_type) = delta_type {
+                sub_type = Some(delta_type.new_type);
+            } else {
+                sub_type = None;
+            }
 
             // define our own generic type -- for example S0 -- and add it to the list of generics
             let new_type = self.generic_gen.next().unwrap();
@@ -303,57 +313,59 @@ impl Fold for Struct1<'_> {
             let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
             self.generic_params.push(generic_param);
             // cmk remember like and figure out if it is top-level or not
+        } else {
+            self.last_like = None;
         }
         println!("fold_type_path: {}", quote!(#type_path));
         type_path
     }
 }
 
-fn old_process_type(
-    ty: &Type,
-    likes: &Vec<Like>,
-    generic_gen: &mut impl Iterator<Item = Type>,
-) -> DeltaType {
-    if let Some((segment, like)) = is_special_type(ty, likes) {
-        // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
-        // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-        // v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
-        // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-        // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
+// fn old_process_type(
+//     ty: &Type,
+//     likes: &Vec<Like>,
+//     generic_gen: &mut impl Iterator<Item = Type>,
+// ) -> DeltaType {
+//     if let Some((segment, like)) = is_special_type(ty, likes) {
+//         // v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
+//         // v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+//         // v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
+//         // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+//         // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
 
-        // If Like<something> is found,
-        //      process something, returning the perhaps new subtype (any maybe new generics),
-        let (sub_type, sub_generic_params) = process_any_subtype(segment, likes, generic_gen);
+//         // If Like<something> is found,
+//         //      process something, returning the perhaps new subtype (any maybe new generics),
+//         let (sub_type, sub_generic_params) = process_any_subtype(segment, likes, generic_gen);
 
-        // define our own generic type -- for example S0 -- and add it to the list of generics
-        let new_type = generic_gen.next().unwrap();
-        // cmk why does the like_to_generic_param function need a move input?
-        let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
+//         // define our own generic type -- for example S0 -- and add it to the list of generics
+//         let new_type = generic_gen.next().unwrap();
+//         // cmk why does the like_to_generic_param function need a move input?
+//         let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
 
-        DeltaType {
-            like: Some(like),
-            new_type,
-            generic_params: [sub_generic_params, vec![generic_param]].concat(),
-        }
-    } else {
-        DeltaType {
-            like: None,
-            new_type: ty.clone(),
-            generic_params: vec![],
-        }
-    }
-}
+//         DeltaType {
+//             like: Some(like),
+//             new_type,
+//             generic_params: [sub_generic_params, vec![generic_param]].concat(),
+//         }
+//     } else {
+//         DeltaType {
+//             like: None,
+//             new_type: ty.clone(),
+//             generic_params: vec![],
+//         }
+//     }
+// }
 
 fn process_any_subtype(
     segment: PathSegment,
     likes: &Vec<Like>,
     generic_gen: &mut impl Iterator<Item = Type>,
-) -> (Option<Type>, Vec<GenericParam>) {
+) -> Option<DeltaType> {
     if let Some(sub_type_inner) = has_sub_type(segment.arguments) {
         let delta_type = process_type(&sub_type_inner, likes, generic_gen);
-        (Some(delta_type.new_type), delta_type.generic_params)
+        Some(delta_type)
     } else {
-        (None, vec![])
+        None
     }
 }
 
@@ -724,19 +736,29 @@ mod tests {
     fn fold_one_path() {
         // cmk 9 rules: parse_quote!
         // cmk 9 rules: use format!(quote!()) to generate strings of code
+        // cmk 9 rules quote! is a nice way to display short ASTs on one line, too
         let before = parse_quote! {IterLike<PathLike> };
         println!("before: {}", quote!(before));
-        let mut gen = UuidGenerator::new();
+        let mut gen = generic_gen_test_factory();
         let mut struct1 = Struct1 {
             likes: to_likes(),
             generic_params: vec![],
             generic_gen: Box::new(&mut gen),
+            last_like: None,
         };
-        let _result = struct1.fold_type(before);
+        let result = struct1.fold_type(before);
         for generic_param in struct1.generic_params {
             println!("generic_param: {}", quote!(#generic_param));
         }
 
-        // println!("result: {:#?}", result);
+        println!(
+            "struct1.last_like.ident: {:#?}",
+            if struct1.last_like.is_some() {
+                struct1.last_like.as_ref().unwrap().special.to_string()
+            } else {
+                "None".to_string()
+            }
+        );
+        println!("result: {}", quote!(#result));
     }
 }
