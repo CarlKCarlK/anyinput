@@ -249,6 +249,7 @@ struct DeltaType {
     generic_params: Vec<GenericParam>,
 }
 
+#[allow(clippy::ptr_arg)]
 fn process_type(
     ty: &Type,
     likes: &Vec<Like>,
@@ -262,7 +263,7 @@ fn process_type(
     let mut struct1 = Struct1 {
         likes: likes.clone(), // cmk too many clones
         generic_params: vec![],
-        generic_gen: Box::new(generic_gen),
+        generic_gen,
         last_like: None,
     };
     let new_type = struct1.fold_type(ty.clone()); // cmk too many clones
@@ -278,7 +279,7 @@ struct Struct1<'a> {
     // cmk rename
     likes: Vec<Like>,
     generic_params: Vec<GenericParam>,
-    generic_gen: Box<&'a mut dyn Iterator<Item = Type>>,
+    generic_gen: &'a mut dyn Iterator<Item = Type>,
     last_like: Option<Like>,
 }
 
@@ -386,19 +387,6 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
             panic!("Parenthesized not supported")
         }
     }
-}
-
-fn type_path_to_ident(type_path: &TypePath) -> String {
-    let segment = first_and_only(type_path.path.segments.iter()).expect("expected one segment cmk");
-    segment.ident.to_string()
-}
-
-fn is_special_type(ty: &Type, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
-    if let Type::Path(type_path) = ty {
-        // print!("type_path: {:#?}", type_path);
-        return is_special_type_path(type_path, likes);
-    }
-    None
 }
 
 fn is_special_type_path(type_path: &TypePath, likes: &Vec<Like>) -> Option<(PathSegment, Like)> {
@@ -743,7 +731,7 @@ mod tests {
         let mut struct1 = Struct1 {
             likes: to_likes(),
             generic_params: vec![],
-            generic_gen: Box::new(&mut gen),
+            generic_gen: &mut gen,
             last_like: None,
         };
         let result = struct1.fold_type(before);
