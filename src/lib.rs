@@ -39,7 +39,6 @@ pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
 #[derive(Debug, Clone, EnumString)]
 #[allow(clippy::enum_variant_names)]
 enum Special {
-    // cmk rename
     ArrayLike,
     StringLike,
     PathLike,
@@ -54,22 +53,18 @@ impl Special {
     ) -> GenericParam {
         match &self {
             Special::ArrayLike => {
-                let new_type = new_type;
                 let sub_type = sub_type.expect("array_1: sub_type");
                 parse_quote!(#new_type : AsRef<[#sub_type]>)
             }
             Special::StringLike => {
-                let new_type = new_type;
-                let _sub_type = sub_type;
+                assert!(sub_type.is_none(), "string should not have sub_type"); // cmk will this get check in release?
                 parse_quote!(#new_type : AsRef<str>)
             }
             Special::PathLike => {
-                let new_type = new_type;
-                let _sub_type = sub_type;
+                assert!(sub_type.is_none(), "path should not have sub_type"); // cmk will this get check in release?
                 parse_quote!(#new_type : AsRef<std::path::Path>)
             }
             Special::IterLike => {
-                let new_type = new_type;
                 let sub_type = sub_type.expect("iter_1: sub_type");
                 parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
             }
