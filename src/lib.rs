@@ -201,14 +201,14 @@ fn process_fn_arg(
 ) -> DeltaFnArg {
     // If the function input is normal (not self, not a macro, etc) ...
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
-        let (delta_type, new_pat_type) = replace_any_specials(pat_type, generic_gen);
+        let (delta_pat_type, new_pat_type) = replace_any_specials(pat_type.clone(), generic_gen);
 
         let new_fn_arg = FnArg::Typed(new_pat_type);
 
         DeltaFnArg {
             fn_arg: new_fn_arg,
-            stmts: delta_type.generate_any_stmts(pat_ident),
-            generic_params: delta_type.generic_params,
+            stmts: delta_pat_type.generate_any_stmts(pat_ident),
+            generic_params: delta_pat_type.generic_params,
         }
     } else {
         DeltaFnArg {
@@ -219,7 +219,7 @@ fn process_fn_arg(
     }
 }
 
-impl DeltaType<'_> {
+impl DeltaPatType<'_> {
     fn generate_any_stmts(&self, pat_ident: &PatIdent) -> Vec<Stmt> {
         if let Some(special) = &self.last_special {
             vec![special.pat_ident_to_stmt(pat_ident)]
@@ -229,8 +229,8 @@ impl DeltaType<'_> {
     }
 }
 
-fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
-    if let FnArg::Typed(pat_type) = arg {
+fn is_normal_fn_arg(fn_arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
+    if let FnArg::Typed(pat_type) = fn_arg {
         if let Pat::Ident(pat_ident) = &*pat_type.pat {
             if let Type::Path(_) = &*pat_type.ty {
                 return Some((pat_ident, pat_type));
@@ -240,40 +240,33 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
     None
 }
 
-// cmk can/should DeltaType and Struct1 be combined?
 #[allow(clippy::ptr_arg)]
-fn replace_any_specials<'a>(
-    pat_type: &'a PatType,
-    generic_gen: &'a mut impl Iterator<Item = TypePath>,
-) -> (DeltaType<'a>, PatType) {
-    // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
-    // Search type and its subtypes for special types starting at the deepest level.
+fn replace_any_specials(
+    old_pat_type: PatType,
+    generic_gen: &mut impl Iterator<Item = TypePath>,
+) -> (DeltaPatType, PatType) {
+    // Search type and its (sub)subtypes for specials starting at the deepest level.
     // When one is found, replace it with a generic.
-    // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
+    // Finally, return the new type and a list of the generic definitions.
+    // Also, if the top-level type was special, return the special type.
 
-    let mut struct1 = DeltaType {
+    let mut delta_pat_type = DeltaPatType {
         generic_params: vec![],
         generic_gen,
         last_special: None,
     };
-    let new_pat_type = struct1.fold_pat_type(pat_type.clone()); // cmk too many clones
+    let new_path_type = delta_pat_type.fold_pat_type(old_pat_type);
 
-    // DeltaType {
-    //     special: struct1.last_special,
-    //     new_type,
-    //     generic_params: struct1.generic_params,
-    // }
-
-    (struct1, new_pat_type)
+    (delta_pat_type, new_path_type)
 }
 
-struct DeltaType<'a> {
+struct DeltaPatType<'a> {
     generic_params: Vec<GenericParam>,
     generic_gen: &'a mut dyn Iterator<Item = TypePath>,
     last_special: Option<Special>,
 }
 
-impl Fold for DeltaType<'_> {
+impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
         println!("fold_type_path (before): {:?}", quote!(#type_path));
 
@@ -337,9 +330,7 @@ fn transform_generics(
     generic_params: Vec<GenericParam>,
 ) -> Punctuated<GenericParam, Comma> {
     let mut new_params = old_params.clone();
-    for new_param in generic_params.iter() {
-        new_params.push(new_param.clone()); // cmk too much cloning
-    }
+    new_params.extend(generic_params);
     new_params
 }
 
@@ -356,7 +347,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
 #[cfg(test)]
 mod tests {
     // cmk use prettyplease::unparse;
-    use crate::{transform_fn, DeltaType, UuidGenerator};
+    use crate::{transform_fn, DeltaPatType, UuidGenerator};
     // cmk remove from cargo use prettyplease::unparse;
     use quote::quote;
     use syn::{fold::Fold, parse_quote, parse_str, ItemFn, TypePath};
@@ -639,7 +630,7 @@ mod tests {
         let before = parse_quote! {IterLike<PathLike> };
         println!("before: {}", quote!(before));
         let mut gen = generic_gen_test_factory();
-        let mut struct1 = DeltaType {
+        let mut struct1 = DeltaPatType {
             generic_params: vec![],
             generic_gen: &mut gen,
             last_special: None,
