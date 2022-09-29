@@ -683,7 +683,7 @@ mod tests {
         }        };
         let expected = parse_quote! {
         pub fn any_count_iter<S0: AsRef<std::path::Path>, S1: IntoIterator<Item = S0>>(
-            i: S1,
+            i: S1
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter(); // todo should the map be optional?
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
@@ -714,7 +714,7 @@ mod tests {
         }};
         let expected = parse_quote! {
         pub fn any_count_vec<S0: AsRef<std::path::Path>>(
-            i: Vec<S0>,
+            i: Vec<S0>
         ) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
