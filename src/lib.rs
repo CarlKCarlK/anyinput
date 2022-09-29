@@ -92,13 +92,13 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypeP
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let (new_inputs, generic_params, stmts) = transform_inputs(&old_fn.sig.inputs, generic_gen);
 
-    // For each special input found, define a new generic, for example, 'S0 : AsRef<str>'
-    let new_generics = transform_generics(&old_fn.sig.generics.params, generic_params);
+    // For each special input found, add a new generic definition, for example, 'S0 : AsRef<str>'
+    let new_params = transform_generics(&old_fn.sig.generics.params, generic_params);
 
-    // For each special input found, add a statement defining a new local variable. For example, 'let s = s.as_ref();'
+    // For each special input found, add a statement(s) defining a new local variable. For example, 'let s = s.as_ref();'
     let new_stmts = transform_stmts(&old_fn.block.stmts, stmts);
 
-    // Create a new function with the transformed inputs, generics, and statements.
+    // Create a new function with the transformed inputs, generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
     // todo Is this the best way to create a new function from an old one?
     ItemFn {
@@ -107,7 +107,7 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypeP
                 // todo: Define all constants outside the loop
                 lt_token: parse_quote!(<),
                 gt_token: parse_quote!(>),
-                params: new_generics,
+                params: new_params,
                 ..old_fn.sig.generics.clone()
             },
             inputs: new_inputs,
@@ -170,8 +170,9 @@ fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> (Punctuated<FnArg, Comma>, Vec<GenericParam>, Vec<Stmt>) {
-    // For each old input, create a new input, transforming the type if it is special.
+    // For each old input, create a new input, transforming the types if they are special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
+
     // Remember the names and types of the special inputs.
     let mut generic_params: Vec<GenericParam> = vec![];
     let mut stmts: Vec<Stmt> = vec![];
@@ -189,6 +190,7 @@ fn transform_inputs(
 }
 
 #[derive(Debug)]
+// the new function input, any statements to add, and any new generic definitions.
 struct DeltaFnArg {
     fn_arg: FnArg,
     generic_params: Vec<GenericParam>,
@@ -201,12 +203,12 @@ fn process_fn_arg(
 ) -> DeltaFnArg {
     // If the function input is normal (not self, not a macro, etc) ...
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
+        // Replace any specials in the type with generics.
         let (delta_pat_type, new_pat_type) = replace_any_specials(pat_type.clone(), generic_gen);
 
-        let new_fn_arg = FnArg::Typed(new_pat_type);
-
+        // Return the new function input, any statements to add, and any new generic definitions.
         DeltaFnArg {
-            fn_arg: new_fn_arg,
+            fn_arg: FnArg::Typed(new_pat_type),
             stmts: delta_pat_type.generate_any_stmts(pat_ident),
             generic_params: delta_pat_type.generic_params,
         }
@@ -229,6 +231,7 @@ impl DeltaPatType<'_> {
     }
 }
 
+// A function argument is normal if it is not self, not a macro, etc.
 fn is_normal_fn_arg(fn_arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
     if let FnArg::Typed(pat_type) = fn_arg {
         if let Pat::Ident(pat_ident) = &*pat_type.pat {
@@ -311,9 +314,9 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
 }
 
 fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> {
+    // A special type path has exactly one segment and a name from the Special enum.
     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-        let ident_string = segment.ident.to_string();
-        if let Ok(special) = Special::from_str(&ident_string) {
+        if let Ok(special) = Special::from_str(segment.ident.to_string().as_ref()) {
             Some((segment.clone(), special))
         } else {
             None
@@ -323,7 +326,7 @@ fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> 
     }
 }
 
-// Define generics for each special input type. For example, 'S0 : AsRef<str>'
+// Add definitions for a generic for each special type. For example, 'S0 : AsRef<str>'
 #[allow(clippy::ptr_arg)]
 fn transform_generics(
     old_params: &Punctuated<GenericParam, Comma>,
@@ -334,7 +337,8 @@ fn transform_generics(
     new_params
 }
 
-// For each special input type, define a new local variable. For example, 'let s = s.as_ref();'
+// For each top-level special input type, define a new local variable. For example, 'let s = s.as_ref();'
+// These new statements will be inserted at the top of the function.
 #[allow(clippy::ptr_arg)]
 fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
     let mut new_stmts = old_stmts.clone();
