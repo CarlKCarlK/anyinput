@@ -33,7 +33,7 @@ pub fn input_like(_args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(quote!(#new_item_fn))
 }
 
-fn string_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
+fn string_1(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
     parse_quote!(#new_type : AsRef<str>)
 }
 fn string_2(name: Ident) -> Stmt {
@@ -41,7 +41,7 @@ fn string_2(name: Ident) -> Stmt {
         let #name = #name.as_ref();
     }
 }
-fn path_1(new_type: &Type, _sub_type: Option<&Type>) -> GenericParam {
+fn path_1(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
     parse_quote!(#new_type : AsRef<std::path::Path>)
 }
 fn path_2(name: Ident) -> Stmt {
@@ -50,7 +50,7 @@ fn path_2(name: Ident) -> Stmt {
     }
 }
 
-fn iter_1(new_type: &Type, sub_type: Option<&Type>) -> GenericParam {
+fn iter_1(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
     let sub_type = sub_type.expect("iter_1: sub_type");
     parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
 }
@@ -60,7 +60,7 @@ fn iter_2(name: Ident) -> Stmt {
     }
 }
 
-fn array_1(new_type: &Type, sub_type: Option<&Type>) -> GenericParam {
+fn array_1(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
     let sub_type = sub_type.expect("array_1: sub_type");
     parse_quote!(#new_type : AsRef<[#sub_type]>)
 }
@@ -98,7 +98,7 @@ fn to_likes() -> Vec<Like> {
     ]
 }
 
-pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = syn::Type>) -> ItemFn {
+pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
     let likes = to_likes();
 
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
@@ -149,7 +149,7 @@ impl UuidGenerator {
 }
 
 impl Iterator for UuidGenerator {
-    type Item = Type;
+    type Item = TypePath;
 
     fn next(&mut self) -> Option<Self::Item> {
         let s = format!("U{}_{}", self.uuid, self.counter);
@@ -181,7 +181,7 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 // v: [StringLike] -> v: [S0], <S0: AsRef<str>>, {}
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
-    generic_gen: &mut impl Iterator<Item = Type>,
+    generic_gen: &mut impl Iterator<Item = TypePath>,
     likes: Vec<Like>,
 ) -> (Punctuated<FnArg, Comma>, Vec<GenericParam>, Vec<Stmt>) {
     // For each old input, create a new input, transforming the type if it is special.
@@ -212,7 +212,7 @@ struct DeltaFnArg {
 fn process_fn_arg(
     old_fn_arg: &FnArg,
     likes: &Vec<Like>,
-    generic_gen: &mut impl Iterator<Item = Type>,
+    generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaFnArg {
     // If the input is 'Typed' (so not self), and
     // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
@@ -275,7 +275,7 @@ struct DeltaType {
 fn process_type(
     ty: &Type,
     likes: &Vec<Like>,
-    generic_gen: &mut impl Iterator<Item = Type>,
+    generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaType {
     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
     // Search type and its subtypes for special types starting at the deepest level.
@@ -301,7 +301,7 @@ struct Struct1<'a> {
     // cmk rename
     likes: Vec<Like>,
     generic_params: Vec<GenericParam>,
-    generic_gen: &'a mut dyn Iterator<Item = Type>,
+    generic_gen: &'a mut dyn Iterator<Item = TypePath>,
     last_like: Option<Like>,
 }
 
@@ -318,14 +318,9 @@ impl Fold for Struct1<'_> {
             self.last_like = Some(like.clone());
             let sub_type = has_sub_type(segment.arguments);
             // define our own generic type -- for example S0 -- and add it to the list of generics
-            let new_type = self.generic_gen.next().unwrap();
-            if let Type::Path(type_path1) = &new_type {
-                type_path = type_path1.clone();
-            } else {
-                panic!("expected Type::Path");
-            }
+            type_path = self.generic_gen.next().unwrap();
             // cmk why does the like_to_generic_param function need a move input?
-            let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
+            let generic_param = (like.like_to_generic_param)(&type_path, sub_type.as_ref());
             self.generic_params.push(generic_param);
             // cmk remember like and figure out if it is top-level or not
         } else {
@@ -395,7 +390,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
 #[derive(Clone)]
 struct Like {
     special: Ident,
-    like_to_generic_param: &'static dyn Fn(&Type, Option<&Type>) -> GenericParam,
+    like_to_generic_param: &'static dyn Fn(&TypePath, Option<&Type>) -> GenericParam,
     ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
 
@@ -405,9 +400,9 @@ mod tests {
     use crate::{to_likes, transform_fn, Struct1, UuidGenerator};
     // cmk remove from cargo use prettyplease::unparse;
     use quote::quote;
-    use syn::{fold::Fold, parse_quote, parse_str, ItemFn, Type};
+    use syn::{fold::Fold, parse_quote, parse_str, ItemFn, TypePath};
 
-    fn str_to_type(s: &str) -> Type {
+    fn str_to_type_path(s: &str) -> TypePath {
         parse_str(s).unwrap()
     }
 
@@ -420,10 +415,10 @@ mod tests {
     //     unparse(&new_file)
     // }
 
-    fn generic_gen_test_factory() -> impl Iterator<Item = Type> + 'static {
+    fn generic_gen_test_factory() -> impl Iterator<Item = TypePath> + 'static {
         (0usize..)
             .into_iter()
-            .map(|i| str_to_type(&format!("S{i}")))
+            .map(|i| str_to_type_path(&format!("S{i}")))
     }
 
     fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
