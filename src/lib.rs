@@ -80,8 +80,6 @@ fn to_specials() -> HashMap<String, Special> {
     map.insert(
         "StringLike".to_string(),
         Special {
-            // cmk likely don't want call_site called here
-            ident: Ident::new("IterLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &string_1,
             ident_to_stmt: &string_2,
         },
@@ -89,7 +87,6 @@ fn to_specials() -> HashMap<String, Special> {
     map.insert(
         "IterLike".to_string(),
         Special {
-            ident: Ident::new("IterLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &iter_1,
             ident_to_stmt: &iter_2,
         },
@@ -97,7 +94,6 @@ fn to_specials() -> HashMap<String, Special> {
     map.insert(
         "PathLike".to_string(),
         Special {
-            ident: Ident::new("PathLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &path_1,
             ident_to_stmt: &path_2,
         },
@@ -105,7 +101,6 @@ fn to_specials() -> HashMap<String, Special> {
     map.insert(
         "ArrayLike".to_string(),
         Special {
-            ident: Ident::new("ArrayLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &array_1,
             ident_to_stmt: &array_2,
         },
@@ -401,7 +396,6 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
 
 #[derive(Clone)]
 struct Special {
-    ident: Ident,
     special_to_generic_param: &'static dyn Fn(&TypePath, Option<&Type>) -> GenericParam,
     ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
@@ -703,14 +697,6 @@ mod tests {
             println!("generic_param: {}", quote!(#generic_param));
         }
 
-        println!(
-            "struct1.last_special.ident: {:#?}",
-            if struct1.last_special.is_some() {
-                struct1.last_special.as_ref().unwrap().ident.to_string()
-            } else {
-                "None".to_string()
-            }
-        );
         println!("result: {}", quote!(#result));
     }
 
