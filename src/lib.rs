@@ -208,7 +208,7 @@ fn process_fn_arg(
         let (delta_type, new_type) = process_type(&*pat_type.ty, generic_gen);
 
         let new_fn_arg = FnArg::Typed(PatType {
-            ty: Box::new(new_type.clone()),
+            ty: Box::new(new_type),
             ..pat_type.clone()
         });
 
@@ -228,7 +228,7 @@ fn process_fn_arg(
     }
 }
 
-fn generate_any_stmts(delta_type: &Struct1, pat_ident: &PatIdent) -> Vec<Stmt> {
+fn generate_any_stmts(delta_type: &DeltaType, pat_ident: &PatIdent) -> Vec<Stmt> {
     if let Some(special) = &delta_type.last_special {
         let name = pat_ident.ident.clone(); // cmk too many clones
         vec![special.ident_to_stmt(name)]
@@ -253,13 +253,13 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 fn process_type<'a>(
     ty: &'a Type,
     generic_gen: &'a mut impl Iterator<Item = TypePath>,
-) -> (Struct1<'a>, Type) {
+) -> (DeltaType<'a>, Type) {
     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
     // Search type and its subtypes for special types starting at the deepest level.
     // When one is found, replace it with a generic.
     // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
 
-    let mut struct1 = Struct1 {
+    let mut struct1 = DeltaType {
         generic_params: vec![],
         generic_gen,
         last_special: None,
@@ -275,21 +275,13 @@ fn process_type<'a>(
     (struct1, new_type)
 }
 
-struct Struct1<'a> {
-    // cmk rename
+struct DeltaType<'a> {
     generic_params: Vec<GenericParam>,
     generic_gen: &'a mut dyn Iterator<Item = TypePath>,
     last_special: Option<Special>,
 }
 
-#[derive(Debug)]
-struct DeltaType_cmk {
-    new_type: Type,
-    special: Option<Special>,
-    generic_params: Vec<GenericParam>,
-}
-
-impl Fold for Struct1<'_> {
+impl Fold for DeltaType<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
         println!("fold_type_path (before): {:?}", quote!(#type_path));
 
@@ -372,7 +364,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
 #[cfg(test)]
 mod tests {
     // cmk use prettyplease::unparse;
-    use crate::{transform_fn, Struct1, UuidGenerator};
+    use crate::{transform_fn, DeltaType, UuidGenerator};
     // cmk remove from cargo use prettyplease::unparse;
     use quote::quote;
     use syn::{fold::Fold, parse_quote, parse_str, ItemFn, TypePath};
@@ -655,7 +647,7 @@ mod tests {
         let before = parse_quote! {IterLike<PathLike> };
         println!("before: {}", quote!(before));
         let mut gen = generic_gen_test_factory();
-        let mut struct1 = Struct1 {
+        let mut struct1 = DeltaType {
             generic_params: vec![],
             generic_gen: &mut gen,
             last_special: None,
