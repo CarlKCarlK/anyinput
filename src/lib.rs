@@ -276,14 +276,16 @@ impl Fold for Struct1 {
 
             // If Like<something> is found,
             //      process something, returning the perhaps new subtype (any maybe new generics),
-            let (sub_type, mut sub_generic_params) =
+            let (sub_type, _sub_generic_params) =
                 process_any_subtype(segment, &self.likes, &mut self.generic_gen);
-            if sub_type.is_some() {
-                self.generic_params.append(&mut sub_generic_params);
-            }
 
             // define our own generic type -- for example S0 -- and add it to the list of generics
             let new_type = self.generic_gen.next().unwrap();
+            if let Type::Path(type_path1) = &new_type {
+                type_path = type_path1.clone();
+            } else {
+                panic!("expected Type::Path");
+            }
             // cmk why does the like_to_generic_param function need a move input?
             let generic_param = (like.like_to_generic_param)(&new_type, sub_type.as_ref());
             self.generic_params.push(generic_param);
@@ -347,7 +349,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
         PathArguments::None => None,
         PathArguments::AngleBracketed(ref args) => {
             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
-            print!("arg: {:#?}", arg);
+            println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
                 // cmk IterLike<PathLike>
                 Some(sub_type2.clone())
@@ -717,6 +719,9 @@ mod tests {
             generic_gen: UuidGenerator::new(),
         };
         let _result = struct1.fold_type(before);
+        for generic_param in struct1.generic_params {
+            println!("generic_param: {}", quote!(#generic_param));
+        }
 
         // println!("result: {:#?}", result);
     }
