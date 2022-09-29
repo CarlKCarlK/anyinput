@@ -7,6 +7,8 @@
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 // https://docs.rs/syn/latest/syn/fold/index.html#example
 // cmk what about Vec<StringLike>?
+// cmk add nd::arrayview
+// cmk make nd support an optional feature
 
 use quote::quote;
 use syn::__private::TokenStream;
@@ -223,6 +225,8 @@ fn process_fn_arg(
             ty: Box::new(delta_type.new_type.clone()),
             ..pat_type.clone()
         });
+
+        // cmk inline this OR generate statements as early as possible
         let stmts = generate_any_stmts(&delta_type, pat_ident);
         DeltaFnArg {
             fn_arg: new_fn_arg,
@@ -258,12 +262,15 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
     None
 }
 
+// cmk if this is going to stick around should be Debug
 struct DeltaType {
     new_type: Type,
     like: Option<Like>,
     generic_params: Vec<GenericParam>,
 }
 
+// cmk move the Likes datastructure elsewhere
+// cmk can/should DeltaType and Struct1 be combined?
 #[allow(clippy::ptr_arg)]
 fn process_type(
     ty: &Type,
@@ -301,14 +308,14 @@ struct Struct1<'a> {
 impl Fold for Struct1<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
         println!("fold_type_path: {:?}", quote!(#type_path));
+
+        // Search for any special (sub...) subtypes, replacing them with generics.
         let mut type_path = fold_type_path(self, type_path);
+
+        // cmk rename 'like' to 'special'
+        // If this type is special, replace it with a generic.
         if let Some((segment, like)) = is_special_type_path(&type_path, &self.likes) {
             self.last_like = Some(like.clone());
-            // StringLike -> S0, S0: AsRef<str>
-            // or IterLike<something>
-
-            // If Like<something> is found,
-            //      process something, returning the perhaps new subtype (any maybe new generics),
             let delta_type = process_any_subtype(segment, &self.likes, &mut self.generic_gen);
 
             let sub_type: Option<Type>;
