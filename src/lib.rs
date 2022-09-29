@@ -35,85 +35,134 @@ pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(quote!(#new_item_fn))
 }
 
-fn string_1(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
-    parse_quote!(#new_type : AsRef<str>)
-}
-fn string_2(name: Ident) -> Stmt {
-    parse_quote! {
-        let #name = #name.as_ref();
-    }
-}
-fn path_1(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
-    parse_quote!(#new_type : AsRef<std::path::Path>)
-}
-fn path_2(name: Ident) -> Stmt {
-    parse_quote! {
-        let #name = #name.as_ref();
-    }
+trait SpecialTrait {
+    // cmk rename to Special
+    fn special_to_generic_param(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam;
+    fn ident_to_stmt(name: Ident) -> Stmt;
 }
 
-fn iter_1(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
-    let sub_type = sub_type.expect("iter_1: sub_type");
-    parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
-}
-fn iter_2(name: Ident) -> Stmt {
-    parse_quote! {
-        let #name = #name.into_iter();
+struct ArrayLike;
+impl SpecialTrait for ArrayLike {
+    fn special_to_generic_param(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
+        let sub_type = sub_type.expect("array_1: sub_type");
+        parse_quote!(#new_type : AsRef<[#sub_type]>)
+    }
+    fn ident_to_stmt(name: Ident) -> Stmt {
+        parse_quote! {
+            let #name = #name.as_ref();
+        }
     }
 }
 
-fn array_1(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
-    let sub_type = sub_type.expect("array_1: sub_type");
-    parse_quote!(#new_type : AsRef<[#sub_type]>)
-}
-fn array_2(name: Ident) -> Stmt {
-    parse_quote! {
-        let #name = #name.as_ref();
+struct StringLike;
+impl SpecialTrait for StringLike {
+    fn special_to_generic_param(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
+        parse_quote!(#new_type : AsRef<str>)
+    }
+    fn ident_to_stmt(name: Ident) -> Stmt {
+        parse_quote! {
+            let #name = #name.as_ref();
+        }
     }
 }
 
-// cmk use Traits
-// cmk use a Hash table
+struct PathLike;
+impl SpecialTrait for PathLike {
+    fn special_to_generic_param(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
+        parse_quote!(#new_type : AsRef<std::path::Path>)
+    }
+    fn ident_to_stmt(name: Ident) -> Stmt {
+        parse_quote! {
+            let #name = #name.as_ref();
+        }
+    }
+}
 
-fn to_specials() -> HashMap<String, Special> {
-    let mut map = HashMap::new();
-    map.insert(
-        "StringLike".to_string(),
-        Special {
-            special_to_generic_param: &string_1,
-            ident_to_stmt: &string_2,
-        },
-    );
-    map.insert(
-        "IterLike".to_string(),
-        Special {
-            special_to_generic_param: &iter_1,
-            ident_to_stmt: &iter_2,
-        },
-    );
-    map.insert(
-        "PathLike".to_string(),
-        Special {
-            special_to_generic_param: &path_1,
-            ident_to_stmt: &path_2,
-        },
-    );
-    map.insert(
-        "ArrayLike".to_string(),
-        Special {
-            special_to_generic_param: &array_1,
-            ident_to_stmt: &array_2,
-        },
-    );
-    map
+struct IterLike;
+impl SpecialTrait for IterLike {
+    fn special_to_generic_param(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
+        let sub_type = sub_type.expect("iter_1: sub_type");
+        parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
+    }
+    fn ident_to_stmt(name: Ident) -> Stmt {
+        parse_quote! {
+            let #name = #name.into_iter();
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum SpecialEnum {
+    // cmk rename
+    ArrayLike,
+    StringLike,
+    PathLike,
+    IterLike,
+}
+
+impl SpecialEnum {
+    fn special_to_generic_param(
+        &self,
+        new_type: &TypePath,
+        sub_type: Option<&Type>,
+    ) -> GenericParam {
+        match &self {
+            SpecialEnum::ArrayLike => {
+                let new_type = new_type;
+                let sub_type = sub_type.expect("array_1: sub_type");
+                parse_quote!(#new_type : AsRef<[#sub_type]>)
+            }
+            SpecialEnum::StringLike => {
+                let new_type = new_type;
+                let _sub_type = sub_type;
+                parse_quote!(#new_type : AsRef<str>)
+            }
+            SpecialEnum::PathLike => {
+                let new_type = new_type;
+                let _sub_type = sub_type;
+                parse_quote!(#new_type : AsRef<std::path::Path>)
+            }
+            SpecialEnum::IterLike => {
+                let new_type = new_type;
+                let sub_type = sub_type.expect("iter_1: sub_type");
+                parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
+            }
+        }
+    }
+
+    fn ident_to_stmt(&self, name: Ident) -> Stmt {
+        match &self {
+            SpecialEnum::ArrayLike => {
+                let name = name;
+                parse_quote! {
+                    let #name = #name.as_ref();
+                }
+            }
+            SpecialEnum::StringLike => {
+                let name = name;
+                parse_quote! {
+                    let #name = #name.as_ref();
+                }
+            }
+            SpecialEnum::PathLike => {
+                let name = name;
+                parse_quote! {
+                    let #name = #name.as_ref();
+                }
+            }
+            SpecialEnum::IterLike => {
+                let name = name;
+                parse_quote! {
+                    let #name = #name.into_iter();
+                }
+            }
+        }
+    }
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
-    let specials = to_specials();
-
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
-    let (new_inputs, generic_params, stmts) =
-        transform_inputs(&old_fn.sig.inputs, generic_gen, specials);
+    let (new_inputs, generic_params, stmts) = transform_inputs(&old_fn.sig.inputs, generic_gen);
 
     // For each special input found, define a new generic, for example, 'S0 : AsRef<str>'
     let new_generics = transform_generics(&old_fn.sig.generics.params, generic_params);
@@ -192,7 +241,6 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
-    specials: HashMap<String, Special>,
 ) -> (Punctuated<FnArg, Comma>, Vec<GenericParam>, Vec<Stmt>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
@@ -201,7 +249,7 @@ fn transform_inputs(
     let mut stmts: Vec<Stmt> = vec![];
 
     for old_fn_arg in old_inputs {
-        let delta_fn_arg = process_fn_arg(old_fn_arg, &specials, generic_gen);
+        let delta_fn_arg = process_fn_arg(old_fn_arg, generic_gen);
         stmts = [stmts, delta_fn_arg.stmts].concat();
         generic_params = [generic_params, delta_fn_arg.generic_params].concat();
         new_fn_args.push(delta_fn_arg.fn_arg);
@@ -221,7 +269,6 @@ struct DeltaFnArg {
 
 fn process_fn_arg(
     old_fn_arg: &FnArg,
-    specials: &HashMap<String, Special>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaFnArg {
     // If the input is 'Typed' (so not self), and
@@ -229,7 +276,7 @@ fn process_fn_arg(
     // the type is 'Path' (so not, for example, a macro)
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // the one and only item in path is, for example, 'StringLike'
-        let delta_type = process_type(&*pat_type.ty, specials, generic_gen);
+        let delta_type = process_type(&*pat_type.ty, generic_gen);
 
         let new_fn_arg = FnArg::Typed(PatType {
             ty: Box::new(delta_type.new_type.clone()),
@@ -255,7 +302,7 @@ fn process_fn_arg(
 fn generate_any_stmts(delta_type: &DeltaType, pat_ident: &PatIdent) -> Vec<Stmt> {
     if let Some(special) = &delta_type.special {
         let name = pat_ident.ident.clone(); // cmk too many clones
-        vec![(special.ident_to_stmt)(name)]
+        vec![special.ident_to_stmt(name)]
     } else {
         vec![]
     }
@@ -275,25 +322,20 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 // cmk if this is going to stick around should be Debug
 struct DeltaType {
     new_type: Type,
-    special: Option<Special>,
+    special: Option<SpecialEnum>,
     generic_params: Vec<GenericParam>,
 }
 
 // cmk move the Specials data structure elsewhere
 // cmk can/should DeltaType and Struct1 be combined?
 #[allow(clippy::ptr_arg)]
-fn process_type(
-    ty: &Type,
-    specials: &HashMap<String, Special>,
-    generic_gen: &mut impl Iterator<Item = TypePath>,
-) -> DeltaType {
+fn process_type(ty: &Type, generic_gen: &mut impl Iterator<Item = TypePath>) -> DeltaType {
     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
     // Search type and its subtypes for special types starting at the deepest level.
     // When one is found, replace it with a generic.
     // Finally, return the new type, a list of the generics. Also, if the top-level type was special, return the special type.
 
     let mut struct1 = Struct1 {
-        specials: specials.clone(), // cmk too many clones
         generic_params: vec![],
         generic_gen,
         last_special: None,
@@ -309,10 +351,9 @@ fn process_type(
 
 struct Struct1<'a> {
     // cmk rename
-    specials: HashMap<String, Special>,
     generic_params: Vec<GenericParam>,
     generic_gen: &'a mut dyn Iterator<Item = TypePath>,
-    last_special: Option<Special>,
+    last_special: Option<SpecialEnum>,
 }
 
 impl Fold for Struct1<'_> {
@@ -323,14 +364,14 @@ impl Fold for Struct1<'_> {
         let mut type_path = fold_type_path(self, type_path);
 
         // If this top-level type is special, replace it with a generic.
-        if let Some((segment, special)) = is_special_type_path(&type_path, &self.specials) {
+        if let Some((segment, special)) = is_special_type_path(&type_path) {
             self.last_special = Some(special.clone()); // remember which kind of special found
 
             type_path = self.generic_gen.next().unwrap(); // Generate the generic type, e.g. S23
 
             // Define the generic type, e.g. S23: AsRef<str>, and remember it.
             let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
-            let generic_param = (special.special_to_generic_param)(&type_path, sub_type.as_ref());
+            let generic_param = special.special_to_generic_param(&type_path, sub_type.as_ref());
             self.generic_params.push(generic_param);
         } else {
             self.last_special = None;
@@ -359,16 +400,24 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
     }
 }
 
-fn is_special_type_path(
-    type_path: &TypePath,
-    specials: &HashMap<String, Special>,
-) -> Option<(PathSegment, Special)> {
+fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, SpecialEnum)> {
     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-        if let Some(special) = specials.get(&segment.ident.to_string()) {
-            return Some((segment.clone(), special.clone())); // todo review all clones
+        let ident_string = segment.ident.to_string();
+        let segment = segment.clone();
+        if ident_string == "ArrayLike" {
+            Some((segment, SpecialEnum::ArrayLike))
+        } else if ident_string == "IterLike" {
+            Some((segment, SpecialEnum::IterLike))
+        } else if ident_string == "StringLike" {
+            Some((segment, SpecialEnum::StringLike))
+        } else if ident_string == "PathLike" {
+            Some((segment, SpecialEnum::PathLike))
+        } else {
+            None
         }
+    } else {
+        None
     }
-    None
 }
 
 // Define generics for each special input type. For example, 'S0 : AsRef<str>'
@@ -403,7 +452,7 @@ struct Special {
 #[cfg(test)]
 mod tests {
     // cmk use prettyplease::unparse;
-    use crate::{to_specials, transform_fn, Struct1, UuidGenerator};
+    use crate::{transform_fn, Struct1, UuidGenerator};
     // cmk remove from cargo use prettyplease::unparse;
     use quote::quote;
     use syn::{fold::Fold, parse_quote, parse_str, ItemFn, TypePath};
@@ -687,7 +736,6 @@ mod tests {
         println!("before: {}", quote!(before));
         let mut gen = generic_gen_test_factory();
         let mut struct1 = Struct1 {
-            specials: to_specials(),
             generic_params: vec![],
             generic_gen: &mut gen,
             last_special: None,
