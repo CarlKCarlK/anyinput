@@ -10,6 +10,8 @@
 // cmk add nd::array view
 // cmk make nd support an optional feature
 
+use std::collections::HashMap;
+
 use quote::quote;
 use syn::__private::TokenStream;
 use syn::fold::{fold_type_path, Fold};
@@ -73,29 +75,42 @@ fn array_2(name: Ident) -> Stmt {
 // cmk use Traits
 // cmk use a Hash table
 
-fn to_specials() -> Vec<Special> {
-    vec![
+fn to_specials() -> HashMap<String, Special> {
+    let mut map = HashMap::new();
+    map.insert(
+        "StringLike".to_string(),
         Special {
-            special: Ident::new("IterLike", proc_macro2::Span::call_site()),
-            special_to_generic_param: &iter_1,
-            ident_to_stmt: &iter_2,
-        },
-        Special {
-            special: Ident::new("ArrayLike", proc_macro2::Span::call_site()),
-            special_to_generic_param: &array_1,
-            ident_to_stmt: &array_2,
-        },
-        Special {
-            special: Ident::new("StringLike", proc_macro2::Span::call_site()),
+            // cmk likely don't want call_site called here
+            ident: Ident::new("IterLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &string_1,
             ident_to_stmt: &string_2,
         },
+    );
+    map.insert(
+        "IterLike".to_string(),
         Special {
-            special: Ident::new("PathLike", proc_macro2::Span::call_site()),
+            ident: Ident::new("IterLike", proc_macro2::Span::call_site()),
+            special_to_generic_param: &iter_1,
+            ident_to_stmt: &iter_2,
+        },
+    );
+    map.insert(
+        "PathLike".to_string(),
+        Special {
+            ident: Ident::new("PathLike", proc_macro2::Span::call_site()),
             special_to_generic_param: &path_1,
             ident_to_stmt: &path_2,
         },
-    ]
+    );
+    map.insert(
+        "ArrayLike".to_string(),
+        Special {
+            ident: Ident::new("ArrayLike", proc_macro2::Span::call_site()),
+            special_to_generic_param: &array_1,
+            ident_to_stmt: &array_2,
+        },
+    );
+    map
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
@@ -182,7 +197,7 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 fn transform_inputs(
     old_inputs: &Punctuated<FnArg, Comma>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
-    specials: Vec<Special>,
+    specials: HashMap<String, Special>,
 ) -> (Punctuated<FnArg, Comma>, Vec<GenericParam>, Vec<Stmt>) {
     // For each old input, create a new input, transforming the type if it is special.
     let mut new_fn_args = Punctuated::<FnArg, Comma>::new();
@@ -211,7 +226,7 @@ struct DeltaFnArg {
 
 fn process_fn_arg(
     old_fn_arg: &FnArg,
-    specials: &Vec<Special>,
+    specials: &HashMap<String, Special>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaFnArg {
     // If the input is 'Typed' (so not self), and
@@ -274,7 +289,7 @@ struct DeltaType {
 #[allow(clippy::ptr_arg)]
 fn process_type(
     ty: &Type,
-    specials: &Vec<Special>,
+    specials: &HashMap<String, Special>,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaType {
     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
@@ -299,7 +314,7 @@ fn process_type(
 
 struct Struct1<'a> {
     // cmk rename
-    specials: Vec<Special>,
+    specials: HashMap<String, Special>,
     generic_params: Vec<GenericParam>,
     generic_gen: &'a mut dyn Iterator<Item = TypePath>,
     last_special: Option<Special>,
@@ -351,16 +366,11 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
 
 fn is_special_type_path(
     type_path: &TypePath,
-    specials: &Vec<Special>,
+    specials: &HashMap<String, Special>,
 ) -> Option<(PathSegment, Special)> {
     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-        // print!("segment: {:#?}", segment);
-        for special in specials {
-            // print!("{:#?}=={:#?} ", segment.ident, special.special);
-            if segment.ident == special.special {
-                // Create a new input with a generic type and remember the name and type.
-                return Some((segment.clone(), special.clone())); // todo review all clones
-            }
+        if let Some(special) = specials.get(&segment.ident.to_string()) {
+            return Some((segment.clone(), special.clone())); // todo review all clones
         }
     }
     None
@@ -391,7 +401,7 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
 
 #[derive(Clone)]
 struct Special {
-    special: Ident,
+    ident: Ident,
     special_to_generic_param: &'static dyn Fn(&TypePath, Option<&Type>) -> GenericParam,
     ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
@@ -696,7 +706,7 @@ mod tests {
         println!(
             "struct1.last_special.ident: {:#?}",
             if struct1.last_special.is_some() {
-                struct1.last_special.as_ref().unwrap().special.to_string()
+                struct1.last_special.as_ref().unwrap().ident.to_string()
             } else {
                 "None".to_string()
             }
