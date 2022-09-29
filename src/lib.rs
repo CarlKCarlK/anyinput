@@ -10,9 +10,10 @@
 // cmk add nd::array view
 // cmk make nd support an optional feature
 
-use std::collections::HashMap;
+use std::str::FromStr;
 
 use quote::quote;
+use strum::EnumString;
 use syn::__private::TokenStream;
 use syn::fold::{fold_type_path, Fold};
 // todo don't use private
@@ -35,64 +36,9 @@ pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(quote!(#new_item_fn))
 }
 
-trait SpecialTrait {
-    // cmk rename to Special
-    fn special_to_generic_param(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam;
-    fn ident_to_stmt(name: Ident) -> Stmt;
-}
-
-struct ArrayLike;
-impl SpecialTrait for ArrayLike {
-    fn special_to_generic_param(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
-        let sub_type = sub_type.expect("array_1: sub_type");
-        parse_quote!(#new_type : AsRef<[#sub_type]>)
-    }
-    fn ident_to_stmt(name: Ident) -> Stmt {
-        parse_quote! {
-            let #name = #name.as_ref();
-        }
-    }
-}
-
-struct StringLike;
-impl SpecialTrait for StringLike {
-    fn special_to_generic_param(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
-        parse_quote!(#new_type : AsRef<str>)
-    }
-    fn ident_to_stmt(name: Ident) -> Stmt {
-        parse_quote! {
-            let #name = #name.as_ref();
-        }
-    }
-}
-
-struct PathLike;
-impl SpecialTrait for PathLike {
-    fn special_to_generic_param(new_type: &TypePath, _sub_type: Option<&Type>) -> GenericParam {
-        parse_quote!(#new_type : AsRef<std::path::Path>)
-    }
-    fn ident_to_stmt(name: Ident) -> Stmt {
-        parse_quote! {
-            let #name = #name.as_ref();
-        }
-    }
-}
-
-struct IterLike;
-impl SpecialTrait for IterLike {
-    fn special_to_generic_param(new_type: &TypePath, sub_type: Option<&Type>) -> GenericParam {
-        let sub_type = sub_type.expect("iter_1: sub_type");
-        parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
-    }
-    fn ident_to_stmt(name: Ident) -> Stmt {
-        parse_quote! {
-            let #name = #name.into_iter();
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-enum SpecialEnum {
+#[derive(Debug, Clone, EnumString)]
+#[allow(clippy::enum_variant_names)]
+enum Special {
     // cmk rename
     ArrayLike,
     StringLike,
@@ -100,29 +46,29 @@ enum SpecialEnum {
     IterLike,
 }
 
-impl SpecialEnum {
+impl Special {
     fn special_to_generic_param(
         &self,
         new_type: &TypePath,
         sub_type: Option<&Type>,
     ) -> GenericParam {
         match &self {
-            SpecialEnum::ArrayLike => {
+            Special::ArrayLike => {
                 let new_type = new_type;
                 let sub_type = sub_type.expect("array_1: sub_type");
                 parse_quote!(#new_type : AsRef<[#sub_type]>)
             }
-            SpecialEnum::StringLike => {
+            Special::StringLike => {
                 let new_type = new_type;
                 let _sub_type = sub_type;
                 parse_quote!(#new_type : AsRef<str>)
             }
-            SpecialEnum::PathLike => {
+            Special::PathLike => {
                 let new_type = new_type;
                 let _sub_type = sub_type;
                 parse_quote!(#new_type : AsRef<std::path::Path>)
             }
-            SpecialEnum::IterLike => {
+            Special::IterLike => {
                 let new_type = new_type;
                 let sub_type = sub_type.expect("iter_1: sub_type");
                 parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
@@ -132,25 +78,13 @@ impl SpecialEnum {
 
     fn ident_to_stmt(&self, name: Ident) -> Stmt {
         match &self {
-            SpecialEnum::ArrayLike => {
+            Special::ArrayLike | Special::StringLike | Special::PathLike => {
                 let name = name;
                 parse_quote! {
                     let #name = #name.as_ref();
                 }
             }
-            SpecialEnum::StringLike => {
-                let name = name;
-                parse_quote! {
-                    let #name = #name.as_ref();
-                }
-            }
-            SpecialEnum::PathLike => {
-                let name = name;
-                parse_quote! {
-                    let #name = #name.as_ref();
-                }
-            }
-            SpecialEnum::IterLike => {
+            Special::IterLike => {
                 let name = name;
                 parse_quote! {
                     let #name = #name.into_iter();
@@ -322,7 +256,7 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 // cmk if this is going to stick around should be Debug
 struct DeltaType {
     new_type: Type,
-    special: Option<SpecialEnum>,
+    special: Option<Special>,
     generic_params: Vec<GenericParam>,
 }
 
@@ -353,7 +287,7 @@ struct Struct1<'a> {
     // cmk rename
     generic_params: Vec<GenericParam>,
     generic_gen: &'a mut dyn Iterator<Item = TypePath>,
-    last_special: Option<SpecialEnum>,
+    last_special: Option<Special>,
 }
 
 impl Fold for Struct1<'_> {
@@ -400,18 +334,11 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
     }
 }
 
-fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, SpecialEnum)> {
+fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> {
     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
         let ident_string = segment.ident.to_string();
-        let segment = segment.clone();
-        if ident_string == "ArrayLike" {
-            Some((segment, SpecialEnum::ArrayLike))
-        } else if ident_string == "IterLike" {
-            Some((segment, SpecialEnum::IterLike))
-        } else if ident_string == "StringLike" {
-            Some((segment, SpecialEnum::StringLike))
-        } else if ident_string == "PathLike" {
-            Some((segment, SpecialEnum::PathLike))
+        if let Ok(special) = Special::from_str(&ident_string) {
+            Some((segment.clone(), special))
         } else {
             None
         }
@@ -441,12 +368,6 @@ fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
         new_stmts.insert(index, new_stmt.clone()); // cmk too much cloning
     }
     new_stmts
-}
-
-#[derive(Clone)]
-struct Special {
-    special_to_generic_param: &'static dyn Fn(&TypePath, Option<&Type>) -> GenericParam,
-    ident_to_stmt: &'static dyn Fn(Ident) -> Stmt,
 }
 
 #[cfg(test)]
