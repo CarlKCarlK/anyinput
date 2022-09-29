@@ -199,23 +199,16 @@ fn process_fn_arg(
     old_fn_arg: &FnArg,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaFnArg {
-    // If the input is 'Typed' (so not self), and
-    // the 'pat' (aka variable) field is variant 'Ident' (so not, for example, a macro), and
-    // the type is 'Path' (so not, for example, a macro)
+    // If the function input is normal (not self, not a macro, etc) ...
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
-        // the one and only item in path is, for example, 'StringLike'
-        let (delta_type, new_type) = process_type(&*pat_type.ty, generic_gen);
+        let (delta_type, new_pat_type) = replace_any_specials(pat_type, generic_gen);
 
-        let new_fn_arg = FnArg::Typed(PatType {
-            ty: Box::new(new_type),
-            ..pat_type.clone()
-        });
+        let new_fn_arg = FnArg::Typed(new_pat_type);
 
-        let stmts = delta_type.generate_any_stmts(pat_ident);
         DeltaFnArg {
             fn_arg: new_fn_arg,
+            stmts: delta_type.generate_any_stmts(pat_ident),
             generic_params: delta_type.generic_params,
-            stmts,
         }
     } else {
         DeltaFnArg {
@@ -249,10 +242,10 @@ fn is_normal_fn_arg(arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 
 // cmk can/should DeltaType and Struct1 be combined?
 #[allow(clippy::ptr_arg)]
-fn process_type<'a>(
-    ty: &'a Type,
+fn replace_any_specials<'a>(
+    pat_type: &'a PatType,
     generic_gen: &'a mut impl Iterator<Item = TypePath>,
-) -> (DeltaType<'a>, Type) {
+) -> (DeltaType<'a>, PatType) {
     // a: IterLike<Vec<SomeWeird<i32,PathLike>>> -> <P0: stuff, P1: iter_stuff of Vec<SomeWeird<i32,P0>>, a: P1, {let a = a.into_iter();}
     // Search type and its subtypes for special types starting at the deepest level.
     // When one is found, replace it with a generic.
@@ -263,7 +256,7 @@ fn process_type<'a>(
         generic_gen,
         last_special: None,
     };
-    let new_type = struct1.fold_type(ty.clone()); // cmk too many clones
+    let new_pat_type = struct1.fold_pat_type(pat_type.clone()); // cmk too many clones
 
     // DeltaType {
     //     special: struct1.last_special,
@@ -271,7 +264,7 @@ fn process_type<'a>(
     //     generic_params: struct1.generic_params,
     // }
 
-    (struct1, new_type)
+    (struct1, new_pat_type)
 }
 
 struct DeltaType<'a> {
