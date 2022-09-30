@@ -88,15 +88,34 @@ impl Special {
     }
 }
 
+// cmk maybe initialize delta_fun_args with the original generics and stmts
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
     // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
-    let delta_fun_args = transform_inputs(&old_fn.sig.inputs, generic_gen);
+    let delta_fun_args = {
+        let old_inputs = &old_fn.sig.inputs;
+        // For each old input, create a new input, transforming the types if they are special.
+
+        let init = DeltaFnArgs {
+            fn_args: Punctuated::<FnArg, Comma>::new(),
+            generic_params: old_fn.sig.generics.params.clone(),
+            stmts: old_fn.block.stmts,
+        };
+
+        old_inputs
+            .iter()
+            .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
+            .fold(init, |mut delta_fun_args, delta_fun_arg| {
+                delta_fun_args.push(delta_fun_arg);
+                delta_fun_args
+            })
+    };
 
     // For each special input found, add a new generic definition, for example, 'S0 : AsRef<str>'
-    let new_params = transform_generics(&old_fn.sig.generics.params, delta_fun_args.generic_params);
+    let new_params = delta_fun_args.generic_params;
 
     // For each special input found, add a statement(s) defining a new local variable. For example, 'let s = s.as_ref();'
-    let new_stmts = transform_stmts(&old_fn.block.stmts, delta_fun_args.stmts);
+    let new_stmts = delta_fun_args.stmts;
+    println!("new_stmts: {:#?}", &new_stmts.len());
 
     // Create a new function with the transformed inputs, generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
@@ -166,40 +185,42 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
 // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
 // v: [StringLike] -> v: [S0], <S0: AsRef<str>>, {}
-fn transform_inputs(
-    old_inputs: &Punctuated<FnArg, Comma>,
-    generic_gen: &mut impl Iterator<Item = TypePath>,
-) -> DeltaFnArgs {
-    // For each old input, create a new input, transforming the types if they are special.
+// fn transform_inputs(
+//     old_inputs: &Punctuated<FnArg, Comma>,
+//     generic_gen: &mut impl Iterator<Item = TypePath>,
+// ) -> DeltaFnArgs {
+//     // For each old input, create a new input, transforming the types if they are special.
 
-    old_inputs
-        .iter()
-        .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
-        .fold(DeltaFnArgs::new(), |mut delta_fun_args, delta_fun_arg| {
-            delta_fun_args.push(delta_fun_arg);
-            delta_fun_args
-        })
-}
+//     old_inputs
+//         .iter()
+//         .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
+//         .fold(DeltaFnArgs::new(), |mut delta_fun_args, delta_fun_arg| {
+//             delta_fun_args.push(delta_fun_arg);
+//             delta_fun_args
+//         })
+// }
 
 struct DeltaFnArgs {
     fn_args: Punctuated<FnArg, Comma>,
-    generic_params: Vec<GenericParam>,
+    generic_params: Punctuated<GenericParam, Comma>,
     stmts: Vec<Stmt>,
 }
 
 impl DeltaFnArgs {
-    fn new() -> Self {
-        Self {
-            fn_args: Punctuated::<FnArg, Comma>::new(),
-            generic_params: vec![],
-            stmts: vec![],
-        }
-    }
+    // fn new() -> Self {
+    //     Self {
+    //         fn_args: Punctuated::<FnArg, Comma>::new(),
+    //         generic_params: vec![],
+    //         stmts: vec![],
+    //     }
+    // }
 
     fn push(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
         self.generic_params.extend(delta_fn_arg.generic_params);
-        self.stmts.extend(delta_fn_arg.stmts);
+        for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
+            self.stmts.insert(index, stmt);
+        }
     }
 }
 
@@ -433,8 +454,8 @@ mod tests {
         }};
         let expected = parse_quote! {
         pub fn any_str_len2<S0: AsRef<str>, S1: AsRef<str>>(a: S0, b: S1) -> Result<usize, anyhow::Error> {
-            let a = a.as_ref();
             let b = b.as_ref();
+            let a = a.as_ref();
             let len = a.len() + b.len();
             Ok(len)
         }};
