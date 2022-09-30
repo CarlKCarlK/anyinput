@@ -89,23 +89,19 @@ impl Special {
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
-    let delta_fun_args = {
-        let old_inputs = &old_fn.sig.inputs;
-
-        let init = DeltaFnArgs {
-            fn_args: Punctuated::<FnArg, Comma>::new(),
-            generic_params: old_fn.sig.generics.params.clone(),
-            stmts: old_fn.block.stmts,
-        };
-
-        old_inputs
-            .iter()
-            .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
-            .fold(init, |mut delta_fun_args, delta_fun_arg| {
-                delta_fun_args.push(delta_fun_arg);
-                delta_fun_args
-            })
+    let init = DeltaFnArgs {
+        fn_args: Punctuated::<FnArg, Comma>::new(),
+        generic_params: old_fn.sig.generics.params.clone(),
+        stmts: old_fn.block.stmts,
     };
+
+    let delta_fun_args = (old_fn.sig.inputs)
+        .iter()
+        .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
+        .fold(init, |mut delta_fun_args, delta_fun_arg| {
+            delta_fun_args.push(delta_fun_arg);
+            delta_fun_args
+        });
 
     // Create a new function with the transformed inputs, generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
