@@ -89,21 +89,23 @@ impl Special {
 }
 
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
+    // Start the functions current generic definitions and statements
     let init = DeltaFnArgs {
         fn_args: Punctuated::<FnArg, Comma>::new(),
         generic_params: old_fn.sig.generics.params.clone(),
         stmts: old_fn.block.stmts,
     };
 
+    // Transform each old argument of the function, accumulating the new arguments, new generic definitions and new statements
     let delta_fun_args = (old_fn.sig.inputs)
         .iter()
-        .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
+        .map(|old_fn_arg| transform_fn_arg(old_fn_arg, generic_gen))
         .fold(init, |mut delta_fun_args, delta_fun_arg| {
-            delta_fun_args.push(delta_fun_arg);
+            delta_fun_args.merge(delta_fun_arg);
             delta_fun_args
         });
 
-    // Create a new function with the transformed inputs, generic definitions, and statements.
+    // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
     // todo Is this the best way to create a new function from an old one?
     ItemFn {
@@ -179,7 +181,7 @@ struct DeltaFnArgs {
 }
 
 impl DeltaFnArgs {
-    fn push(&mut self, delta_fn_arg: DeltaFnArg) {
+    fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
         self.generic_params.extend(delta_fn_arg.generic_params);
         for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
@@ -198,7 +200,7 @@ struct DeltaFnArg {
     stmts: Vec<Stmt>,
 }
 
-fn process_fn_arg(
+fn transform_fn_arg(
     old_fn_arg: &FnArg,
     generic_gen: &mut impl Iterator<Item = TypePath>,
 ) -> DeltaFnArg {
@@ -214,6 +216,7 @@ fn process_fn_arg(
             generic_params: delta_pat_type.generic_params,
         }
     } else {
+        // if input is not normal, return it unchanged.
         DeltaFnArg {
             fn_arg: old_fn_arg.clone(),
             generic_params: vec![],
