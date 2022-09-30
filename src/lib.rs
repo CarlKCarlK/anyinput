@@ -88,12 +88,9 @@ impl Special {
     }
 }
 
-// cmk maybe initialize delta_fun_args with the original generics and stmts
 pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypePath>) -> ItemFn {
-    // Check that function for special inputs such as 's: StringLike'. If found, replace with generics such as 's: S0' and remember.
     let delta_fun_args = {
         let old_inputs = &old_fn.sig.inputs;
-        // For each old input, create a new input, transforming the types if they are special.
 
         let init = DeltaFnArgs {
             fn_args: Punctuated::<FnArg, Comma>::new(),
@@ -110,13 +107,6 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypeP
             })
     };
 
-    // For each special input found, add a new generic definition, for example, 'S0 : AsRef<str>'
-    let new_params = delta_fun_args.generic_params;
-
-    // For each special input found, add a statement(s) defining a new local variable. For example, 'let s = s.as_ref();'
-    let new_stmts = delta_fun_args.stmts;
-    println!("new_stmts: {:#?}", &new_stmts.len());
-
     // Create a new function with the transformed inputs, generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
     // todo Is this the best way to create a new function from an old one?
@@ -126,14 +116,14 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = TypeP
                 // todo: Define all constants outside the loop
                 lt_token: parse_quote!(<),
                 gt_token: parse_quote!(>),
-                params: new_params,
+                params: delta_fun_args.generic_params,
                 ..old_fn.sig.generics.clone()
             },
             inputs: delta_fun_args.fn_args,
             ..old_fn.sig.clone()
         },
         block: Box::new(Block {
-            stmts: new_stmts,
+            stmts: delta_fun_args.stmts,
             ..*old_fn.block
         }),
         ..old_fn
