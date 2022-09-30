@@ -175,20 +175,6 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 // v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
 // v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
 // v: [StringLike] -> v: [S0], <S0: AsRef<str>>, {}
-// fn transform_inputs(
-//     old_inputs: &Punctuated<FnArg, Comma>,
-//     generic_gen: &mut impl Iterator<Item = TypePath>,
-// ) -> DeltaFnArgs {
-//     // For each old input, create a new input, transforming the types if they are special.
-
-//     old_inputs
-//         .iter()
-//         .map(|old_fn_arg| process_fn_arg(old_fn_arg, generic_gen))
-//         .fold(DeltaFnArgs::new(), |mut delta_fun_args, delta_fun_arg| {
-//             delta_fun_args.push(delta_fun_arg);
-//             delta_fun_args
-//         })
-// }
 
 struct DeltaFnArgs {
     fn_args: Punctuated<FnArg, Comma>,
@@ -197,14 +183,6 @@ struct DeltaFnArgs {
 }
 
 impl DeltaFnArgs {
-    // fn new() -> Self {
-    //     Self {
-    //         fn_args: Punctuated::<FnArg, Comma>::new(),
-    //         generic_params: vec![],
-    //         stmts: vec![],
-    //     }
-    // }
-
     fn push(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
         self.generic_params.extend(delta_fn_arg.generic_params);
@@ -351,28 +329,6 @@ fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> 
     } else {
         None
     }
-}
-
-// Add definitions for a generic for each special type. For example, 'S0 : AsRef<str>'
-#[allow(clippy::ptr_arg)]
-fn transform_generics(
-    old_params: &Punctuated<GenericParam, Comma>,
-    generic_params: Vec<GenericParam>,
-) -> Punctuated<GenericParam, Comma> {
-    let mut new_params = old_params.clone();
-    new_params.extend(generic_params);
-    new_params
-}
-
-// For each top-level special input type, define a new local variable. For example, 'let s = s.as_ref();'
-// These new statements will be inserted at the top of the function.
-#[allow(clippy::ptr_arg)]
-fn transform_stmts(old_stmts: &Vec<Stmt>, stmts: Vec<Stmt>) -> Vec<Stmt> {
-    let mut new_stmts = old_stmts.clone();
-    for (index, new_stmt) in stmts.iter().enumerate() {
-        new_stmts.insert(index, new_stmt.clone()); // cmk too much cloning
-    }
-    new_stmts
 }
 
 #[cfg(test)]
