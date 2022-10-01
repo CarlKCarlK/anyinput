@@ -59,6 +59,7 @@ impl Special {
         &self,
         new_type: &TypePath,
         sub_type: Option<&Type>,
+        lifetime: Option<Lifetime>,
     ) -> GenericParam {
         match &self {
             Special::ArrayLike => {
@@ -79,8 +80,16 @@ impl Special {
             }
             Special::NdArrayLike => {
                 let sub_type = sub_type.expect("nd_array: sub_type");
-                parse_quote!(#new_type : A: Into<ndarray::ArrayView1<#sub_type>>)
-                // should be <'a, T: 'a, A: Into<nd::ArrayView1<'a, T>>
+                let lifetime = lifetime.expect("nd_array: lifetime"); // cmk on other branches, check is None
+                println!("new_type: {}", quote!(#new_type)); // cmk 9 rules this is a nice way to print. {:#?} doesn't work as well here
+                println!("sub_type: {}", quote!(#sub_type));
+                println!("lifetime: {}", quote!(#lifetime));
+                // should be S0: Into<ndarray::ArrayView1<'a, usize>
+                // parse_quote!(#new_type : Into<ndarray::ArrayView1<#lifetime, #sub_type>>)
+                let _generic_param: GenericParam =
+                    parse_quote!(#new_type: Into<ndarray::ArrayView1<#lifetime, #sub_type>>);
+                println!("gp: {}", quote!(#_generic_param));
+                _generic_param
             }
         }
     }
@@ -281,6 +290,7 @@ fn replace_any_specials(
         generic_gen,
         last_special: None,
     };
+    println!("old_pat_type: {:?}", quote!(#old_pat_type));
     let new_path_type = delta_pat_type.fold_pat_type(old_pat_type);
 
     (delta_pat_type, new_path_type)
@@ -308,18 +318,24 @@ impl Fold for DeltaPatType<'_> {
 
             // Define the generic type, e.g. S23: AsRef<str>, and remember it.
             let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
-            let generic_param = special.special_to_generic_param(&type_path, sub_type.as_ref());
-            self.generic_params.push(generic_param);
 
+            let lifetime: Option<Lifetime>;
             if special.should_add_lifetime() {
-                let s = self.generic_gen.next().unwrap(); // Generate the generic type, e.g. S23
-                let lifetime: Lifetime = parse_str(&s).expect("parse failure"); // cmk 9 rules: best & easy way to create an object?
-                let generic_param: GenericParam = parse_quote! { #lifetime };
+                let s = self.generic_gen.next().unwrap().to_lowercase(); // Generate the generic type, e.g. S23
+                let lifetime_cmk: Lifetime = parse_str(&format!("'{}", &s)).expect("parse failure"); // cmk 9 rules: best & easy way to create an object?
+                let generic_param: GenericParam = parse_quote! { #lifetime_cmk };
                 self.generic_params.push(generic_param);
 
-                type_path = parse_quote! { #type_path<#lifetime> };
+                // type_path = parse_quote! { #type_path<#lifetime_cmk> };
+                lifetime = Some(lifetime_cmk);
                 //cmk GenericParam::Lifetime(LifetimeDef::new(lifetime)); // cmk 9 rules: This is another way to create an object.
+            } else {
+                lifetime = None;
             }
+
+            let generic_param =
+                special.special_to_generic_param(&type_path, sub_type.as_ref(), lifetime);
+            self.generic_params.push(generic_param);
         } else {
             self.last_special = None;
         }
@@ -366,7 +382,7 @@ mod tests {
     use crate::{transform_fn, DeltaPatType, UuidGenerator};
     // cmk remove from cargo use prettyplease::unparse;
     use quote::quote;
-    use syn::{fold::Fold, parse_quote, ItemFn};
+    use syn::{fold::Fold, parse_quote, GenericParam, ItemFn, Lifetime};
 
     fn generic_gen_test_factory() -> impl Iterator<Item = String> + 'static {
         (0usize..).into_iter().map(|i| format!("S{i}"))
@@ -679,6 +695,18 @@ mod tests {
     }
 
     #[test]
+    fn understand_lifetime_parse() {
+        let a = Lifetime::new("'a", syn::__private::Span::call_site());
+        println!("a: {}", quote!(#a));
+        let b: Lifetime = parse_quote!('a);
+        println!("b: {}", quote!(#b));
+
+        let _generic_param: GenericParam = parse_quote!(S1: Into<ndarray::ArrayView1<'S0, S2>>);
+        println!("gp: {}", quote!(#_generic_param));
+        println!("done");
+    }
+
+    #[test]
     fn one_ndarray_usize_input() {
         let before = parse_quote! {
         pub fn any_slice_len(a: NdArrayLike<usize>) -> Result<usize, anyhow::Error> {
@@ -686,7 +714,9 @@ mod tests {
             Ok(len)
         }        };
         let expected = parse_quote! {
-        pub fn any_slice_len<S0: Into<ndarray::ArrayView1<usize>>>(a: S0) -> Result<usize, anyhow::Error> {
+        pub fn any_slice_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
+            a: S0
+        ) -> Result<usize, anyhow::Error> {
             let a = a.into();
             let len = a.len();
             Ok(len)
@@ -695,7 +725,7 @@ mod tests {
         let after = transform_fn(before, &mut generic_gen_test_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_slice_len<'a, S0: Into<ndarray::ArrayView1<'a, usize>>>(
+        pub fn any_slice_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
             a: S0,
         ) -> Result<usize, anyhow::Error> {
             let a = a.into();
