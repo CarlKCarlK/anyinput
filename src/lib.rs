@@ -10,7 +10,7 @@ mod tests {
     #[test]
     fn one_input() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1(s: AnyString) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }
@@ -21,7 +21,7 @@ mod tests {
     #[test]
     fn two_inputs() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_str_len2(a: StringLike, b: StringLike) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len2(a: AnyString, b: AnyString) -> Result<usize, anyhow::Error> {
             let len = a.len() + b.len();
             Ok(len)
         }
@@ -44,11 +44,7 @@ mod tests {
     #[test]
     fn one_plus_two_input() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_str_len1plus2(
-            a: usize,
-            s: StringLike,
-            b: usize,
-        ) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1plus2(a: usize, s: AnyString, b: usize) -> Result<usize, anyhow::Error> {
             let len = s.len() + a + b;
             Ok(len)
         }
@@ -59,7 +55,7 @@ mod tests {
     #[test]
     fn one_path_input() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_count_path(p: PathLike) -> Result<usize, anyhow::Error> {
+        pub fn any_count_path(p: AnyPath) -> Result<usize, anyhow::Error> {
             let count = p.iter().count();
             Ok(count)
         }
@@ -70,7 +66,7 @@ mod tests {
     #[test]
     fn one_iter_usize_input() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_count_iter(i: IterLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: AnyIter<usize>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }
@@ -81,7 +77,7 @@ mod tests {
     #[test]
     fn one_iter_i32() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_count_iter(i: IterLike<i32>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: AnyIter<i32>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }
@@ -92,7 +88,7 @@ mod tests {
     #[test]
     fn one_iter_t() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_count_iter<T>(i: IterLike<T>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter<T>(i: AnyIter<T>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }
@@ -103,7 +99,7 @@ mod tests {
     #[test]
     fn one_iter_path() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_count_iter(i: IterLike<PathLike>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: AnyIter<AnyPath>) -> Result<usize, anyhow::Error> {
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }
@@ -115,7 +111,7 @@ mod tests {
     #[test]
     fn one_vec_path() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_count_vec(i: Vec<PathLike>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_vec(i: Vec<AnyPath>) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }
@@ -126,7 +122,7 @@ mod tests {
     #[test]
     fn one_array_usize_input() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_slice_len(a: ArrayLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_slice_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }
@@ -139,7 +135,7 @@ mod tests {
     #[test]
     fn one_ndarray_usize_input_x() {
         #[input_special]
-        pub fn any_slice_len(a: NdArrayLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_slice_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }
@@ -147,33 +143,31 @@ mod tests {
     }
     // cmk remove "slice" from examples vocabulary
 
+    // cmk in readme.md mention that you'll get nice VC hints for the type.
+    // cmk add option into input_special for long variables
     #[test]
     fn complex() {
         #[input_special]
-        pub fn any_slice_len(
+        pub fn complex_total(
             a: usize,
-            b: Vec<ArrayLike<IterLike<PathLike>>>,
-            c: NdArrayLike<usize>,
+            b: AnyIter<Vec<AnyArray<AnyPath>>>,
+            c: AnyNdArray<usize>,
         ) -> Result<usize, anyhow::Error> {
             let mut total = a + c.sum();
-            for vec_item in b {
-                let vec_item = vec_item.as_ref();
-                for _array_item in vec_item.iter() {
-                    total += 1;
-                    let array_item = _array_item;
-                    // let len = array_item.len();
-                    // for any_path in &array_item.into_iter() {
-                    //     let any_path = any_path.as_ref();
-                    //     total += any_path.iter().count();
-                    // }
+            for vec in b {
+                for any_array in vec {
+                    let any_array = any_array.as_ref();
+                    for any_path in any_array.iter() {
+                        let any_path = any_path.as_ref();
+                        total += any_path.iter().count();
+                    }
                 }
             }
             Ok(total)
         }
-
         assert_eq!(
-            any_slice_len(3, vec![[["one"]]], [1, 2, 3].as_ref()).unwrap(),
-            3
+            complex_total(17, [vec![["one"]]], [1, 2, 3].as_ref()).unwrap(),
+            24
         );
     }
 

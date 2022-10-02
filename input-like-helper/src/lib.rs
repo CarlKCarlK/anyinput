@@ -22,6 +22,10 @@ use syn::{
 };
 use uuid::Uuid;
 
+pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
+    (0usize..).into_iter().map(|i| format!("{i}"))
+}
+
 // #[proc_macro_attribute]
 pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
     // panic!("input: {:#?}", &input);
@@ -29,7 +33,9 @@ pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
     let old_item_fn = parse_macro_input!(input as ItemFn);
     // panic!("input: {:#?}", &input);
 
-    let new_item_fn = transform_fn(old_item_fn, &mut UuidGenerator::new());
+    let mut generic_gen = generic_gen_simple_factory();
+
+    let new_item_fn = transform_fn(old_item_fn, &mut generic_gen);
 
     TokenStream::from(quote!(#new_item_fn))
 }
@@ -382,13 +388,9 @@ fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> 
 #[cfg(test)]
 mod tests {
     // cmk 9 rules prettyplease::unparse vs quote! trick
-    use crate::{transform_fn, DeltaPatType, UuidGenerator};
+    use crate::{generic_gen_simple_factory, transform_fn, DeltaPatType, UuidGenerator};
     use quote::quote;
     use syn::{fold::Fold, parse_quote, GenericParam, ItemFn, Lifetime};
-
-    fn generic_gen_test_factory() -> impl Iterator<Item = String> + 'static {
-        (0usize..).into_iter().map(|i| format!("{i}"))
-    }
 
     fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
         if after == expected {
@@ -428,7 +430,7 @@ mod tests {
             Ok(len)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
     }
 
@@ -447,7 +449,7 @@ mod tests {
             Ok(len)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
     }
 
@@ -464,7 +466,7 @@ mod tests {
             Ok(len)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
     }
 
@@ -482,7 +484,7 @@ mod tests {
             Ok(len)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
     }
 
@@ -492,7 +494,7 @@ mod tests {
             let len = s.len();
             Ok(len)
         }};
-        let _ = transform_fn(before, &mut generic_gen_test_factory());
+        let _ = transform_fn(before, &mut generic_gen_simple_factory());
     }
 
     #[test]
@@ -509,7 +511,7 @@ mod tests {
             Ok(count)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
     }
 
@@ -527,7 +529,7 @@ mod tests {
             Ok(count)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn any_count_iter<S0: IntoIterator<Item = usize>>(
@@ -554,7 +556,7 @@ mod tests {
             Ok(count)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn any_count_iter<S0: IntoIterator<Item = i32>>(i: S0) -> Result<usize, anyhow::Error> {
@@ -579,7 +581,7 @@ mod tests {
             Ok(count)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn any_count_iter<T, S0: IntoIterator<Item = T>>(
@@ -608,7 +610,7 @@ mod tests {
             Ok(sum_count)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn any_count_iter<S0: AsRef<std::path::Path>, S1: IntoIterator<Item = S0>>(
@@ -638,7 +640,7 @@ mod tests {
             Ok(sum_count)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn any_count_vec<S0: AsRef<std::path::Path>>(
@@ -657,7 +659,7 @@ mod tests {
         // cmk 9 rules quote! is a nice way to display short ASTs on one line, too
         let before = parse_quote! {AnyIter<AnyPath> };
         println!("before: {}", quote!(before));
-        let mut gen = generic_gen_test_factory();
+        let mut gen = generic_gen_simple_factory();
         let mut struct1 = DeltaPatType {
             generic_params: vec![],
             generic_gen: &mut gen,
@@ -685,7 +687,7 @@ mod tests {
             Ok(len)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn any_slice_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
@@ -724,7 +726,7 @@ mod tests {
             Ok(len)
         }};
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         // cmk clippy would like a comma after a:S0, but the macro doesn't do that.
@@ -786,7 +788,7 @@ mod tests {
         }
         };
 
-        let after = transform_fn(before, &mut generic_gen_test_factory());
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn complex_total<
