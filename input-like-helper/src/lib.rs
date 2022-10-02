@@ -37,20 +37,18 @@ pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
 #[derive(Debug, Clone, EnumString)]
 #[allow(clippy::enum_variant_names)]
 enum Special {
-    ArrayLike,
-    StringLike,
-    PathLike,
-    IterLike,
-    NdArrayLike,
+    AnyArray,
+    AnyString,
+    AnyPath,
+    AnyIter,
+    AnyNdArray,
 }
 
 impl Special {
     fn should_add_lifetime(&self) -> bool {
         match self {
-            Special::ArrayLike | Special::StringLike | Special::PathLike | Special::IterLike => {
-                false
-            }
-            Special::NdArrayLike => true,
+            Special::AnyArray | Special::AnyString | Special::AnyPath | Special::AnyIter => false,
+            Special::AnyNdArray => true,
         }
     }
     fn special_to_generic_param(
@@ -60,23 +58,23 @@ impl Special {
         lifetime: Option<Lifetime>,
     ) -> GenericParam {
         match &self {
-            Special::ArrayLike => {
+            Special::AnyArray => {
                 let sub_type = sub_type.expect("array_1: sub_type");
                 parse_quote!(#new_type : AsRef<[#sub_type]>)
             }
-            Special::StringLike => {
+            Special::AnyString => {
                 assert!(sub_type.is_none(), "string should not have sub_type"); // cmk will this get checked in release?
                 parse_quote!(#new_type : AsRef<str>)
             }
-            Special::PathLike => {
+            Special::AnyPath => {
                 assert!(sub_type.is_none(), "path should not have sub_type"); // cmk will this get checked in release?
                 parse_quote!(#new_type : AsRef<std::path::Path>)
             }
-            Special::IterLike => {
+            Special::AnyIter => {
                 let sub_type = sub_type.expect("iter_1: sub_type");
                 parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
             }
-            Special::NdArrayLike => {
+            Special::AnyNdArray => {
                 let sub_type = sub_type.expect("nd_array: sub_type");
                 // cmk on other branches, check is None
                 let lifetime = lifetime.expect("nd_array: lifetime");
@@ -88,17 +86,17 @@ impl Special {
     fn pat_ident_to_stmt(&self, pat_ident: &PatIdent) -> Stmt {
         let name = &pat_ident.ident;
         match &self {
-            Special::ArrayLike | Special::StringLike | Special::PathLike => {
+            Special::AnyArray | Special::AnyString | Special::AnyPath => {
                 parse_quote! {
                     let #name = #name.as_ref();
                 }
             }
-            Special::IterLike => {
+            Special::AnyIter => {
                 parse_quote! {
                     let #name = #name.into_iter();
                 }
             }
-            Special::NdArrayLike => {
+            Special::AnyNdArray => {
                 parse_quote! {
                     let #name = #name.into();
                 }
@@ -155,7 +153,7 @@ pub struct UuidGenerator {
 impl UuidGenerator {
     pub fn new() -> Self {
         Self {
-            uuid: Uuid::new_v4().to_string().replace('-', "_"),
+            uuid: Uuid::new_v4().to_string().replace('-', ""),
             counter: 0,
         }
     }
@@ -165,7 +163,7 @@ impl Iterator for UuidGenerator {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let s = format!("U{}_{}", self.uuid, self.counter);
+        let s = format!("{}_{}", self.uuid, self.counter);
         // cmk00 let result = parse_str(&s).expect("parse failure"); // cmk
         self.counter += 1;
         Some(s)
@@ -181,17 +179,17 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     }
 }
 
-// Look for special inputs such as 's: StringLike'. If found, replace with generics special 's: S0'.
-// Todo support: PathLike, IterLike<T>, ArrayLike<T> (including ArrayLike<PathLike>), NdArraySpecial<T>, etc.
+// Look for special inputs such as 's: AnyString'. If found, replace with generics special 's: S0'.
+// Todo support: AnyPath, AnyIter<T>, AnyArray<T> (including AnyArray<AnyPath>), NdArraySpecial<T>, etc.
 
 // for each input, if it is top-level special, replace it with generic(s) and remember the generic(s) and the top-level variable.
 // v: i32 -> v: i32, <>, {}
-// v: StringLike -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
-// v: IterLike<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: IterLike<StringLike> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
-// v: IterLike<IterLike<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: IterLike<IterLike<StringLike>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
-// v: [StringLike] -> v: [S0], <S0: AsRef<str>>, {}
+// v: AnyString -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
+// v: AnyIter<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: AnyIter<AnyString> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
+// v: AnyIter<AnyIter<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
+// v: AnyIter<AnyIter<AnyString>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
+// v: [AnyString] -> v: [S0], <S0: AsRef<str>>, {}
 
 struct DeltaFnArgs {
     fn_args: Punctuated<FnArg, Comma>,
@@ -292,6 +290,17 @@ struct DeltaPatType<'a> {
     last_special: Option<Special>,
 }
 
+fn camel_case_to_snake_case(s: &str) -> String {
+    let mut result = String::new();
+    for (index, c) in s.chars().enumerate() {
+        if index > 0 && c.is_uppercase() {
+            result.push('_');
+        }
+        result.push(c.to_ascii_lowercase());
+    }
+    result
+}
+
 impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
         // cmk println!("fold_type_path (before): {:?}", quote!(#type_path));
@@ -303,15 +312,21 @@ impl Fold for DeltaPatType<'_> {
         if let Some((segment, special)) = is_special_type_path(&type_path) {
             self.last_special = Some(special.clone()); // remember which kind of special found
 
-            let s = self.generic_gen.next().unwrap(); // Generate the generic type, e.g. S23
+            let s0 = self.generic_gen.next().unwrap(); // Generate the generic type, e.g. S23
+            let s = format!("{:?}{}", &special, s0); // cmk implement display and remove "?"
             type_path = parse_str(&s).expect("parse failure");
 
             // Define the generic type, e.g. S23: AsRef<str>, and remember it.
             let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
 
             let maybe_lifetime = if special.should_add_lifetime() {
-                let s = self.generic_gen.next().unwrap().to_lowercase(); // Generate the generic type, e.g. S23
-                let lifetime: Lifetime = parse_str(&format!("'{}", &s)).expect("parse failure"); // cmk 9 rules: best & easy way to create an object?
+                // cmk do this better
+                let s = format!(
+                    "'{}{}",
+                    camel_case_to_snake_case(&format!("{:?}", &special)),
+                    &self.generic_gen.next().unwrap(),
+                );
+                let lifetime: Lifetime = parse_str(&s).expect("parse failure"); // cmk 9 rules: best & easy way to create an object?
                 let generic_param: GenericParam = parse_quote! { #lifetime };
                 self.generic_params.push(generic_param);
 
@@ -339,7 +354,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
             // cmk println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
-                // cmk IterLike<PathLike>
+                // cmk AnyIter<AnyPath>
                 Some(sub_type2.clone())
             } else {
                 panic!("expected GenericArgument::Type cmk");
@@ -372,7 +387,7 @@ mod tests {
     use syn::{fold::Fold, parse_quote, GenericParam, ItemFn, Lifetime};
 
     fn generic_gen_test_factory() -> impl Iterator<Item = String> + 'static {
-        (0usize..).into_iter().map(|i| format!("S{i}"))
+        (0usize..).into_iter().map(|i| format!("{i}"))
     }
 
     fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
@@ -402,7 +417,7 @@ mod tests {
     #[test]
     fn one_input() {
         let before = parse_quote! {
-        pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1(s: AnyString) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }        };
@@ -420,7 +435,7 @@ mod tests {
     #[test]
     fn two_inputs() {
         let before = parse_quote! {
-        pub fn any_str_len2(a: StringLike, b: StringLike) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len2(a: AnyString, b: AnyString) -> Result<usize, anyhow::Error> {
             let len = a.len() + b.len();
             Ok(len)
         }};
@@ -456,7 +471,7 @@ mod tests {
     #[test]
     fn one_plus_two_input() {
         let before = parse_quote! {
-        pub fn any_str_len1plus2(a: usize, s: StringLike, b: usize) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len1plus2(a: usize, s: AnyString, b: usize) -> Result<usize, anyhow::Error> {
             let len = s.len()+a+b;
             Ok(len)
         }};
@@ -473,7 +488,7 @@ mod tests {
 
     #[test]
     fn one_input_uuid() {
-        let before = parse_quote! {pub fn any_str_len1(s: StringLike) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {pub fn any_str_len1(s: AnyString) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }};
@@ -483,7 +498,7 @@ mod tests {
     #[test]
     fn one_path_input() {
         let before = parse_quote! {
-        pub fn any_count_path(p: PathLike) -> Result<usize, anyhow::Error> {
+        pub fn any_count_path(p: AnyPath) -> Result<usize, anyhow::Error> {
             let count = p.iter().count();
             Ok(count)
         }        };
@@ -501,7 +516,7 @@ mod tests {
     #[test]
     fn one_iter_usize_input() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: AnyIter<usize>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -528,7 +543,7 @@ mod tests {
     #[test]
     fn one_iter_i32() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterLike<i32>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: AnyIter<i32>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -553,7 +568,7 @@ mod tests {
     #[test]
     fn one_iter_t() {
         let before = parse_quote! {
-        pub fn any_count_iter<T>(i: IterLike<T>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter<T>(i: AnyIter<T>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }        };
@@ -580,7 +595,7 @@ mod tests {
     #[test]
     fn one_iter_path() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: IterLike<PathLike>) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter(i: AnyIter<AnyPath>) -> Result<usize, anyhow::Error> {
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }        };
@@ -610,7 +625,7 @@ mod tests {
     fn one_vec_path() {
         let before = parse_quote! {
         pub fn any_count_vec(
-            i: Vec<PathLike>,
+            i: Vec<AnyPath>,
         ) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
@@ -640,7 +655,7 @@ mod tests {
         // cmk 9 rules: parse_quote!
         // cmk 9 rules: use format!(quote!()) to generate strings of code
         // cmk 9 rules quote! is a nice way to display short ASTs on one line, too
-        let before = parse_quote! {IterLike<PathLike> };
+        let before = parse_quote! {AnyIter<AnyPath> };
         println!("before: {}", quote!(before));
         let mut gen = generic_gen_test_factory();
         let mut struct1 = DeltaPatType {
@@ -659,7 +674,7 @@ mod tests {
     #[test]
     fn one_array_usize_input() {
         let before = parse_quote! {
-        pub fn any_slice_len(a: ArrayLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_slice_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }        };
@@ -696,7 +711,7 @@ mod tests {
     #[test]
     fn one_ndarray_usize_input() {
         let before = parse_quote! {
-        pub fn any_slice_len(a: NdArrayLike<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_slice_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }        };
@@ -726,10 +741,10 @@ mod tests {
     #[test]
     fn complex() {
         let before = parse_quote! {
-            pub fn any_slice_len(
+            pub fn complex_total(
                 a: usize,
-                b: IterLike<Vec<ArrayLike<PathLike>>>,
-                c: NdArrayLike<usize>,
+                b: AnyIter<Vec<AnyArray<AnyPath>>>,
+                c: AnyNdArray<usize>,
             ) -> Result<usize, anyhow::Error> {
                 let mut total = a + c.sum();
                 for vec in b {
@@ -746,15 +761,14 @@ mod tests {
         };
         let expected = parse_quote! {
             pub fn complex_total<
-            'a4,
+            'any_nd_array4,
             AnyPath0: AsRef<std::path::Path>,
             AnyArray1: AsRef<[AnyPath0]>,
             AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
-            AnyNdArray3: Into<ndarray::ArrayView1<'a4, usize>>,
-        >(
+            AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>>(
             a: usize,
             b: AnyIter2,
-            c: AnyNdArray3,
+            c: AnyNdArray3
         ) -> Result<usize, anyhow::Error> {
             let c = c.into();
             let b = b.into_iter();
@@ -770,17 +784,17 @@ mod tests {
             }
             Ok(total)
         }
-            };
+        };
 
         let after = transform_fn(before, &mut generic_gen_test_factory());
         assert_item_fn_eq(&after, &expected);
 
         pub fn complex_total<
-            'a4,
+            'any_nd_array4,
             AnyPath0: AsRef<std::path::Path>,
             AnyArray1: AsRef<[AnyPath0]>,
             AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
-            AnyNdArray3: Into<ndarray::ArrayView1<'a4, usize>>,
+            AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>,
         >(
             a: usize,
             b: AnyIter2,
@@ -800,10 +814,9 @@ mod tests {
             }
             Ok(total)
         }
-
         assert_eq!(
-            complex_total(3, [vec![["one"]]], [1, 2, 3].as_ref()).unwrap(),
-            3
+            complex_total(17, [vec![["one"]]], [1, 2, 3].as_ref()).unwrap(),
+            24
         );
     }
 }
