@@ -1,13 +1,11 @@
 [package]
-name = "input-like"
+name = "input-like-helper"
 version = "0.1.0"
 edition = "2021"
-# cmk fill in more info
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-# proc-macro = true
 
 [dev-dependencies]
 # cmk understand what trybuild does
