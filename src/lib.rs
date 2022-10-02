@@ -134,6 +134,8 @@ mod tests {
         Ok(())
     }
 
+    // cmk remove unwrap from examples and use ?
+
     #[test]
     fn one_ndarray_usize_input_x() {
         #[input_special]
@@ -142,6 +144,37 @@ mod tests {
             Ok(len)
         }
         assert_eq!(any_slice_len([1, 2, 3].as_ref()).unwrap(), 3);
+    }
+    // cmk remove "slice" from examples vocabulary
+
+    #[test]
+    fn complex() {
+        #[input_special]
+        pub fn any_slice_len(
+            a: usize,
+            b: Vec<ArrayLike<IterLike<PathLike>>>,
+            c: NdArrayLike<usize>,
+        ) -> Result<usize, anyhow::Error> {
+            let mut total = a + c.sum();
+            for vec_item in b {
+                let vec_item = vec_item.as_ref();
+                for _array_item in vec_item.iter() {
+                    total += 1;
+                    let array_item = _array_item;
+                    // let len = array_item.len();
+                    // for any_path in &array_item.into_iter() {
+                    //     let any_path = any_path.as_ref();
+                    //     total += any_path.iter().count();
+                    // }
+                }
+            }
+            Ok(total)
+        }
+
+        assert_eq!(
+            any_slice_len(3, vec![[["one"]]], [1, 2, 3].as_ref()).unwrap(),
+            3
+        );
     }
 
     // cmk must test badly-formed functions to see that the error messages make sense.

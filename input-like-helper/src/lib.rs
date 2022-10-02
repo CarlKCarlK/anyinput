@@ -722,4 +722,88 @@ mod tests {
         }
         assert_eq!(any_slice_len([1, 2, 3].as_ref()).unwrap(), 3);
     }
+
+    #[test]
+    fn complex() {
+        let before = parse_quote! {
+            pub fn any_slice_len(
+                a: usize,
+                b: IterLike<Vec<ArrayLike<PathLike>>>,
+                c: NdArrayLike<usize>,
+            ) -> Result<usize, anyhow::Error> {
+                let mut total = a + c.sum();
+                for vec in b {
+                    for any_array in vec {
+                        let any_array = any_array.as_ref();
+                        for any_path in any_array.iter() {
+                            let any_path = any_path.as_ref();
+                            total += any_path.iter().count();
+                        }
+                    }
+                }
+                Ok(total)
+                }
+        };
+        let expected = parse_quote! {
+            pub fn complex_total<
+            'a4,
+            AnyPath0: AsRef<std::path::Path>,
+            AnyArray1: AsRef<[AnyPath0]>,
+            AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
+            AnyNdArray3: Into<ndarray::ArrayView1<'a4, usize>>,
+        >(
+            a: usize,
+            b: AnyIter2,
+            c: AnyNdArray3,
+        ) -> Result<usize, anyhow::Error> {
+            let c = c.into();
+            let b = b.into_iter();
+            let mut total = a + c.sum();
+            for vec in b {
+                for any_array in vec {
+                    let any_array = any_array.as_ref();
+                    for any_path in any_array.iter() {
+                        let any_path = any_path.as_ref();
+                        total += any_path.iter().count();
+                    }
+                }
+            }
+            Ok(total)
+        }
+            };
+
+        let after = transform_fn(before, &mut generic_gen_test_factory());
+        assert_item_fn_eq(&after, &expected);
+
+        pub fn complex_total<
+            'a4,
+            AnyPath0: AsRef<std::path::Path>,
+            AnyArray1: AsRef<[AnyPath0]>,
+            AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
+            AnyNdArray3: Into<ndarray::ArrayView1<'a4, usize>>,
+        >(
+            a: usize,
+            b: AnyIter2,
+            c: AnyNdArray3,
+        ) -> Result<usize, anyhow::Error> {
+            let c = c.into();
+            let b = b.into_iter();
+            let mut total = a + c.sum();
+            for vec in b {
+                for any_array in vec {
+                    let any_array = any_array.as_ref();
+                    for any_path in any_array.iter() {
+                        let any_path = any_path.as_ref();
+                        total += any_path.iter().count();
+                    }
+                }
+            }
+            Ok(total)
+        }
+
+        assert_eq!(
+            complex_total(3, [vec![["one"]]], [1, 2, 3].as_ref()).unwrap(),
+            3
+        );
+    }
 }
