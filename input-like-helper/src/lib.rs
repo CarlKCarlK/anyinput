@@ -147,13 +147,13 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
     }
 }
 
-struct UuidGenerator {
+pub struct UuidGenerator {
     counter: usize,
     uuid: String,
 }
 
 impl UuidGenerator {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             uuid: Uuid::new_v4().to_string().replace('-', "_"),
             counter: 0,

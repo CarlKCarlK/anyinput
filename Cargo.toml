@@ -7,23 +7,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-# proc-macro = true
 
 [dev-dependencies]
-# cmk understand what trybuild does
-trybuild = { version = "1.0", features = ["diff"] }
 anyhow = "1.0"
 
-[dependencies]
-uuid = { version = "1.1.2", features = ["v4"] }
 
-syn = { version = "1.0.60", features = [
-    "extra-traits",
-    "full",
-    "fold",
-    "derive",
-] }
-quote = "1.0.9"
-proc-macro2 = "1.0.24"
-strum = { version = "0.24", features = ["derive"] }
-ndarray = "0.15.4" # make a feature
+[dependencies]
+input-like-derive = { path = "input-like-derive" }
+ndarray = "0.15.4"

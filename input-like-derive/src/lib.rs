@@ -1,14 +1,16 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use input_like_helper::{transform_fn, UuidGenerator};
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, ItemFn};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[proc_macro_attribute]
+pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
+    // panic!("input: {:#?}", &input);
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+    let old_item_fn = parse_macro_input!(input as ItemFn);
+    // panic!("input: {:#?}", &input);
+
+    let new_item_fn = transform_fn(old_item_fn, &mut UuidGenerator::new());
+
+    TokenStream::from(quote!(#new_item_fn))
 }
