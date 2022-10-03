@@ -1,5 +1,5 @@
 [package]
-name = "input-like"
+name = "anyinput"
 version = "0.1.0"
 edition = "2021"
 # cmk fill in more info
@@ -13,5 +13,5 @@ anyhow = "1.0"
 
 
 [dependencies]
-input-like-derive = { path = "input-like-derive" }
+anyinput-derive = { path = "anyinput-derive" }
 ndarray = "0.15.4"

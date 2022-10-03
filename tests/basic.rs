@@ -1,7 +1,7 @@
-// use input_like::input_like;
+// use anyinput::anyinput;
 // use std::path::{Path, PathBuf};
 
-// #[input_like]
+// #[anyinput]
 // pub fn any_path_part_count(path: impl AsRef<Path>) -> Result<usize, anyhow::Error> {
 //     let path = path.as_ref();
 //     let count = path.iter().count();

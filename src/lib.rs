@@ -5,7 +5,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use input_like_derive::input_special;
+    use anyinput_derive::input_special;
 
     #[test]
     fn one_input() -> Result<(), anyhow::Error> {
@@ -172,4 +172,5 @@ mod tests {
     }
 
     // cmk must test badly-formed functions to see that the error messages make sense.
+    // cmk is there a nice way to diff the output vs. the expected output?
 }

@@ -1,5 +1,5 @@
 [package]
-name = "input-like-derive"
+name = "anyinput-derive"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-input-like-helper = { path = "../input-like-helper" }
+anyinput-helper = { path = "../anyinput-helper" }
 proc-macro2 = "1.0.24"
 quote = "1.0.9"
 # cmk are all features needed?

@@ -1,4 +1,4 @@
-use input_like_helper::{generic_gen_simple_factory, transform_fn};
+use anyinput_helper::{generic_gen_simple_factory, transform_fn};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
