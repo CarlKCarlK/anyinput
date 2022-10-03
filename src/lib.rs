@@ -5,11 +5,11 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use anyinput_derive::input_special;
+    use anyinput_derive::anyinput;
 
     #[test]
     fn one_input() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_str_len1(s: AnyString) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
@@ -20,7 +20,7 @@ mod tests {
 
     #[test]
     fn two_inputs() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_str_len2(a: AnyString, b: AnyString) -> Result<usize, anyhow::Error> {
             let len = a.len() + b.len();
             Ok(len)
@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn zero_inputs() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_str_len0() -> Result<usize, anyhow::Error> {
             let len = 0;
             Ok(len)
@@ -43,7 +43,7 @@ mod tests {
 
     #[test]
     fn one_plus_two_input() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_str_len1plus2(a: usize, s: AnyString, b: usize) -> Result<usize, anyhow::Error> {
             let len = s.len() + a + b;
             Ok(len)
@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn one_path_input() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_count_path(p: AnyPath) -> Result<usize, anyhow::Error> {
             let count = p.iter().count();
             Ok(count)
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn one_iter_usize_input() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_count_iter(i: AnyIter<usize>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn one_iter_i32() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_count_iter(i: AnyIter<i32>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn one_iter_t() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_count_iter<T>(i: AnyIter<T>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn one_iter_path() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_count_iter(i: AnyIter<AnyPath>) -> Result<usize, anyhow::Error> {
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn one_vec_path() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_count_vec(i: Vec<AnyPath>) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn one_array_usize_input() -> Result<(), anyhow::Error> {
-        #[input_special]
+        #[anyinput]
         pub fn any_array_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn one_ndarray_usize_input_x() {
-        #[input_special]
+        #[anyinput]
         pub fn any_array_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
@@ -143,10 +143,10 @@ mod tests {
     // cmk remove "slice" from examples vocabulary
 
     // cmk in readme.md mention that you'll get nice VC hints for the type.
-    // cmk add option into input_special for long variables
+    // cmk add option into anyinput for long variables
     #[test]
     fn complex() {
-        #[input_special]
+        #[anyinput]
         pub fn complex_total(
             a: usize,
             b: AnyIter<Vec<AnyArray<AnyPath>>>,

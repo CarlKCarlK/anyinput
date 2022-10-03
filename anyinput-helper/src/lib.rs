@@ -27,7 +27,7 @@ pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
 }
 
 // #[proc_macro_attribute]
-pub fn input_special(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn anyinput(_args: TokenStream, input: TokenStream) -> TokenStream {
     // panic!("input: {:#?}", &input);
 
     let old_item_fn = parse_macro_input!(input as ItemFn);
