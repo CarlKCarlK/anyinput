@@ -107,7 +107,6 @@ mod tests {
         Ok(())
     }
 
-    // cmk rename UU generator from U* to T* -- also test generator
     #[test]
     fn one_vec_path() -> Result<(), anyhow::Error> {
         #[input_special]

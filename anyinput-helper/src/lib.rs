@@ -156,6 +156,12 @@ pub struct UuidGenerator {
     uuid: String,
 }
 
+impl Default for UuidGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UuidGenerator {
     pub fn new() -> Self {
         Self {
@@ -206,7 +212,13 @@ struct DeltaFnArgs {
 impl DeltaFnArgs {
     fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
+        if !self.fn_args.empty_or_trailing() {
+            self.fn_args.push_punct(Comma::default());
+        }
         self.generic_params.extend(delta_fn_arg.generic_params);
+        if !self.generic_params.empty_or_trailing() {
+            self.generic_params.push_punct(Comma::default());
+        }
         for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
             self.stmts.insert(index, stmt);
         }
@@ -746,7 +758,7 @@ mod tests {
             pub fn complex_total(
                 a: usize,
                 b: AnyIter<Vec<AnyArray<AnyPath>>>,
-                c: AnyNdArray<usize>,
+                c: AnyNdArray<usize>
             ) -> Result<usize, anyhow::Error> {
                 let mut total = a + c.sum();
                 for vec in b {
@@ -767,10 +779,11 @@ mod tests {
             AnyPath0: AsRef<std::path::Path>,
             AnyArray1: AsRef<[AnyPath0]>,
             AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
-            AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>>(
+            AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>,
+        >(
             a: usize,
             b: AnyIter2,
-            c: AnyNdArray3
+            c: AnyNdArray3,
         ) -> Result<usize, anyhow::Error> {
             let c = c.into();
             let b = b.into_iter();
@@ -816,6 +829,7 @@ mod tests {
             }
             Ok(total)
         }
+
         assert_eq!(
             complex_total(17, [vec![["one"]]], [1, 2, 3].as_ref()).unwrap(),
             24
