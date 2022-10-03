@@ -212,13 +212,15 @@ struct DeltaFnArgs {
 impl DeltaFnArgs {
     fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
-        if !self.fn_args.empty_or_trailing() {
-            self.fn_args.push_punct(Comma::default());
-        }
+        // cmk
+        // if !self.fn_args.empty_or_trailing() {
+        //     self.fn_args.push_punct(Comma::default());
+        // }
         self.generic_params.extend(delta_fn_arg.generic_params);
-        if !self.generic_params.empty_or_trailing() {
-            self.generic_params.push_punct(Comma::default());
-        }
+        // cmk
+        // if !self.generic_params.empty_or_trailing() && self.generic_params.len() > 1 {
+        //     self.generic_params.push_punct(Comma::default());
+        // }
         for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
             self.stmts.insert(index, stmt);
         }
@@ -414,8 +416,15 @@ mod tests {
         if after_str == expected_str {
             return;
         }
-        println!("after: {}", after_str);
+        println!(
+            "{}",
+            colored_diff::PrettyDifference {
+                expected: &expected_str,
+                actual: &after_str,
+            }
+        );
         println!("expected: {}", expected_str);
+        println!("after   : {}", after_str);
         panic!("after != expected");
     }
 
@@ -431,38 +440,63 @@ mod tests {
     #[test]
     fn one_input() {
         let before = parse_quote! {
-        pub fn any_str_len1(s: AnyString) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len(s: AnyString) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
-        }        };
+        }
+           };
         let expected = parse_quote! {
-        pub fn any_str_len1<S0: AsRef<str>>(s: S0) -> Result<usize, anyhow::Error> {
-            let s = s.as_ref();
-            let len = s.len();
-            Ok(len)
-        }};
+            pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+                let s = s.as_ref();
+                let len = s.len();
+                Ok(len)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
+
+        pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+            let s = s.as_ref();
+            let len = s.len();
+            Ok(len)
+        }
+        assert!(any_str_len("abc").is_ok());
     }
 
     #[test]
     fn two_inputs() {
         let before = parse_quote! {
-        pub fn any_str_len2(a: AnyString, b: AnyString) -> Result<usize, anyhow::Error> {
-            let len = a.len() + b.len();
-            Ok(len)
-        }};
+            pub fn any_str_len(a: AnyString, b: AnyString) -> Result<usize, anyhow::Error> {
+                let len = a.len() + b.len();
+                Ok(len)
+            }
+        };
         let expected = parse_quote! {
-        pub fn any_str_len2<S0: AsRef<str>, S1: AsRef<str>>(a: S0, b: S1) -> Result<usize, anyhow::Error> {
+            pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
+                a: AnyString0,
+                b: AnyString1
+            ) -> Result<usize, anyhow::Error> {
+                let b = b.as_ref();
+                let a = a.as_ref();
+                let len = a.len() + b.len();
+                Ok(len)
+            }
+        };
+
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
+        assert_item_fn_eq(&after, &expected);
+
+        pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
+            a: AnyString0,
+            b: AnyString1,
+        ) -> Result<usize, anyhow::Error> {
             let b = b.as_ref();
             let a = a.as_ref();
             let len = a.len() + b.len();
             Ok(len)
-        }};
-
-        let after = transform_fn(before, &mut generic_gen_simple_factory());
-        assert_item_fn_eq(&after, &expected);
+        }
+        assert_eq!(any_str_len("abc", "defg".to_string()).unwrap(), 7);
     }
 
     #[test]
@@ -485,24 +519,41 @@ mod tests {
     #[test]
     fn one_plus_two_input() {
         let before = parse_quote! {
-        pub fn any_str_len1plus2(a: usize, s: AnyString, b: usize) -> Result<usize, anyhow::Error> {
-            let len = s.len()+a+b;
-            Ok(len)
-        }};
+            pub fn any_str_len_plus2(a: usize, s: AnyString, b: usize) -> Result<usize, anyhow::Error> {
+                let len = s.len()+a+b;
+                Ok(len)
+            }
+        };
         let expected = parse_quote! {
-        pub fn any_str_len1plus2<S0: AsRef<str>>(a: usize, s: S0, b: usize) -> Result<usize, anyhow::Error> {
-            let s = s.as_ref();
-            let len = s.len()+a+b;
-            Ok(len)
-        }};
+            pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
+                a: usize,
+                s: AnyString0,
+                b: usize
+            ) -> Result<usize, anyhow::Error> {
+                let s = s.as_ref();
+                let len = s.len() + a + b;
+                Ok(len)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
+
+        pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
+            a: usize,
+            s: AnyString0,
+            b: usize,
+        ) -> Result<usize, anyhow::Error> {
+            let s = s.as_ref();
+            let len = s.len() + a + b;
+            Ok(len)
+        }
+        assert_eq!(any_str_len_plus2(1, "abc", 2).unwrap(), 6);
     }
 
     #[test]
     fn one_input_uuid() {
-        let before = parse_quote! {pub fn any_str_len1(s: AnyString) -> Result<usize, anyhow::Error> {
+        let before = parse_quote! {pub fn any_str_len(s: AnyString) -> Result<usize, anyhow::Error> {
             let len = s.len();
             Ok(len)
         }};
@@ -515,37 +566,54 @@ mod tests {
         pub fn any_count_path(p: AnyPath) -> Result<usize, anyhow::Error> {
             let count = p.iter().count();
             Ok(count)
-        }        };
+        }
+          };
         let expected = parse_quote! {
-        pub fn any_count_path<S0: AsRef<std::path::Path>>(p: S0) -> Result<usize, anyhow::Error> {
-            let p = p.as_ref();
-            let count = p.iter().count();
-            Ok(count)
-        }};
+            pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
+                p: AnyPath0
+            ) -> Result<usize, anyhow::Error> {
+                let p = p.as_ref();
+                let count = p.iter().count();
+                Ok(count)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
+
+        pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
+            p: AnyPath0,
+        ) -> Result<usize, anyhow::Error> {
+            let p = p.as_ref();
+            let count = p.iter().count();
+            Ok(count)
+        }
+        assert_eq!(any_count_path("abc/ed").unwrap(), 2);
     }
 
     #[test]
     fn one_iter_usize_input() {
         let before = parse_quote! {
-        pub fn any_count_iter(i: AnyIter<usize>) -> Result<usize, anyhow::Error> {
-            let count = i.count();
-            Ok(count)
-        }        };
+            pub fn any_count_iter(i: AnyIter<usize>) -> Result<usize, anyhow::Error> {
+                let count = i.count();
+                Ok(count)
+            }
+        };
         let expected = parse_quote! {
-        pub fn any_count_iter<S0: IntoIterator<Item = usize>>(i: S0) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
-            let count = i.count();
-            Ok(count)
-        }};
+            pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
+                i: AnyIter0
+            ) -> Result<usize, anyhow::Error> {
+                let i = i.into_iter();
+                let count = i.count();
+                Ok(count)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_count_iter<S0: IntoIterator<Item = usize>>(
-            i: S0,
+        pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
+            i: AnyIter0,
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter();
             let count = i.count();
@@ -560,18 +628,24 @@ mod tests {
         pub fn any_count_iter(i: AnyIter<i32>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
-        }        };
+        }
+            };
         let expected = parse_quote! {
-        pub fn any_count_iter<S0: IntoIterator<Item = i32>>(i: S0) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
-            let count = i.count();
-            Ok(count)
-        }};
+            pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
+                i: AnyIter0
+            ) -> Result<usize, anyhow::Error> {
+                let i = i.into_iter();
+                let count = i.count();
+                Ok(count)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_count_iter<S0: IntoIterator<Item = i32>>(i: S0) -> Result<usize, anyhow::Error> {
+        pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
+            i: AnyIter0,
+        ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter();
             let count = i.count();
             Ok(count)
@@ -585,19 +659,23 @@ mod tests {
         pub fn any_count_iter<T>(i: AnyIter<T>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
-        }        };
+        }
+           };
         let expected = parse_quote! {
-        pub fn any_count_iter<T, S0: IntoIterator<Item = T>>(i: S0) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
-            let count = i.count();
-            Ok(count)
-        }};
+            pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
+                i: AnyIter0
+            ) -> Result<usize, anyhow::Error> {
+                let i = i.into_iter();
+                let count = i.count();
+                Ok(count)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_count_iter<T, S0: IntoIterator<Item = T>>(
-            i: S0,
+        pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
+            i: AnyIter0,
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter();
             let count = i.count();
@@ -612,23 +690,31 @@ mod tests {
         pub fn any_count_iter(i: AnyIter<AnyPath>) -> Result<usize, anyhow::Error> {
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
-        }        };
+        }
+           };
         let expected = parse_quote! {
-        pub fn any_count_iter<S0: AsRef<std::path::Path>, S1: IntoIterator<Item = S0>>(
-            i: S1
-        ) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter(); // todo should the map be optional?
-            let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
-            Ok(sum_count)
-        }};
+                pub fn any_count_iter<
+                AnyPath0: AsRef<std::path::Path>,
+                AnyIter1: IntoIterator<Item = AnyPath0>
+            >(
+                i: AnyIter1
+            ) -> Result<usize, anyhow::Error> {
+                let i = i.into_iter();
+                let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
+                Ok(sum_count)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_count_iter<S0: AsRef<std::path::Path>, S1: IntoIterator<Item = S0>>(
-            i: S1,
+        pub fn any_count_iter<
+            AnyPath0: AsRef<std::path::Path>,
+            AnyIter1: IntoIterator<Item = AnyPath0>,
+        >(
+            i: AnyIter1,
         ) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter(); // todo should the map be optional?
+            let i = i.into_iter();
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }
@@ -638,15 +724,16 @@ mod tests {
     #[test]
     fn one_vec_path() {
         let before = parse_quote! {
-        pub fn any_count_vec(
-            i: Vec<AnyPath>,
-        ) -> Result<usize, anyhow::Error> {
-            let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
-            Ok(sum_count)
-        }};
+            pub fn any_count_vec(
+                i: Vec<AnyPath>,
+            ) -> Result<usize, anyhow::Error> {
+                let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
+                Ok(sum_count)
+            }
+        };
         let expected = parse_quote! {
-        pub fn any_count_vec<S0: AsRef<std::path::Path>>(
-            i: Vec<S0>
+        pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
+            i: Vec<AnyPath0>
         ) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
@@ -655,8 +742,8 @@ mod tests {
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_count_vec<S0: AsRef<std::path::Path>>(
-            i: Vec<S0>,
+        pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
+            i: Vec<AnyPath0>,
         ) -> Result<usize, anyhow::Error> {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
@@ -691,18 +778,24 @@ mod tests {
         pub fn any_array_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
-        }        };
+        }
+          };
         let expected = parse_quote! {
-        pub fn any_array_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
-            let a = a.as_ref();
-            let len = a.len();
-            Ok(len)
-        }};
+            pub fn any_array_len<AnyArray0: AsRef<[usize]>>(
+                a: AnyArray0
+            ) -> Result<usize, anyhow::Error> {
+                let a = a.as_ref();
+                let len = a.len();
+                Ok(len)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_array_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
+        pub fn any_array_len<AnyArray0: AsRef<[usize]>>(
+            a: AnyArray0,
+        ) -> Result<usize, anyhow::Error> {
             let a = a.as_ref();
             let len = a.len();
             Ok(len)
@@ -730,20 +823,27 @@ mod tests {
             Ok(len)
         }        };
         let expected = parse_quote! {
-        pub fn any_array_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
-            a: S0
-        ) -> Result<usize, anyhow::Error> {
-            let a = a.into();
-            let len = a.len();
-            Ok(len)
-        }};
+                pub fn any_array_len<
+                'any_nd_array1,
+                AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>
+            >(
+                a: AnyNdArray0
+            ) -> Result<usize, anyhow::Error> {
+                let a = a.into();
+                let len = a.len();
+                Ok(len)
+            }
+        };
 
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
         // cmk clippy would like a comma after a:S0, but the macro doesn't do that.
-        pub fn any_array_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
-            a: S0,
+        pub fn any_array_len<
+            'any_nd_array1,
+            AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>,
+        >(
+            a: AnyNdArray0,
         ) -> Result<usize, anyhow::Error> {
             let a = a.into();
             let len = a.len();
@@ -779,11 +879,11 @@ mod tests {
             AnyPath0: AsRef<std::path::Path>,
             AnyArray1: AsRef<[AnyPath0]>,
             AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
-            AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>,
+            AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>
         >(
             a: usize,
             b: AnyIter2,
-            c: AnyNdArray3,
+            c: AnyNdArray3
         ) -> Result<usize, anyhow::Error> {
             let c = c.into();
             let b = b.into_iter();
