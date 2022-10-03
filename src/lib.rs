@@ -122,11 +122,11 @@ mod tests {
     #[test]
     fn one_array_usize_input() -> Result<(), anyhow::Error> {
         #[input_special]
-        pub fn any_slice_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_array_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }
-        assert_eq!(any_slice_len([1, 2, 3]).unwrap(), 3);
+        assert_eq!(any_array_len([1, 2, 3]).unwrap(), 3);
         Ok(())
     }
 
@@ -135,11 +135,11 @@ mod tests {
     #[test]
     fn one_ndarray_usize_input_x() {
         #[input_special]
-        pub fn any_slice_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_array_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }
-        assert_eq!(any_slice_len([1, 2, 3].as_ref()).unwrap(), 3);
+        assert_eq!(any_array_len([1, 2, 3].as_ref()).unwrap(), 3);
     }
     // cmk remove "slice" from examples vocabulary
 

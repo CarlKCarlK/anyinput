@@ -676,12 +676,12 @@ mod tests {
     #[test]
     fn one_array_usize_input() {
         let before = parse_quote! {
-        pub fn any_slice_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_array_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }        };
         let expected = parse_quote! {
-        pub fn any_slice_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
+        pub fn any_array_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
             let a = a.as_ref();
             let len = a.len();
             Ok(len)
@@ -690,12 +690,12 @@ mod tests {
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        pub fn any_slice_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
+        pub fn any_array_len<S0: AsRef<[usize]>>(a: S0) -> Result<usize, anyhow::Error> {
             let a = a.as_ref();
             let len = a.len();
             Ok(len)
         }
-        assert_eq!(any_slice_len([1, 2, 3]).unwrap(), 3);
+        assert_eq!(any_array_len([1, 2, 3]).unwrap(), 3);
     }
 
     #[test]
@@ -713,12 +713,12 @@ mod tests {
     #[test]
     fn one_ndarray_usize_input() {
         let before = parse_quote! {
-        pub fn any_slice_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
+        pub fn any_array_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }        };
         let expected = parse_quote! {
-        pub fn any_slice_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
+        pub fn any_array_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
             a: S0
         ) -> Result<usize, anyhow::Error> {
             let a = a.into();
@@ -730,14 +730,14 @@ mod tests {
         assert_item_fn_eq(&after, &expected);
 
         // cmk clippy would like a comma after a:S0, but the macro doesn't do that.
-        pub fn any_slice_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
+        pub fn any_array_len<'s1, S0: Into<ndarray::ArrayView1<'s1, usize>>>(
             a: S0,
         ) -> Result<usize, anyhow::Error> {
             let a = a.into();
             let len = a.len();
             Ok(len)
         }
-        assert_eq!(any_slice_len([1, 2, 3].as_ref()).unwrap(), 3);
+        assert_eq!(any_array_len([1, 2, 3].as_ref()).unwrap(), 3);
     }
 
     #[test]
