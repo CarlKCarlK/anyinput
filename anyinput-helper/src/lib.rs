@@ -496,7 +496,9 @@ mod tests {
             let len = a.len() + b.len();
             Ok(len)
         }
-        assert_eq!(any_str_len("abc", "defg".to_string()).unwrap(), 7);
+
+        let s = "1234".to_string();
+        assert_eq!(any_str_len("abc", s).unwrap(), 7);
     }
 
     #[test]

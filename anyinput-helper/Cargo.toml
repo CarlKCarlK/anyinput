@@ -15,7 +15,6 @@ colored-diff = "0.2.3"
 
 [dependencies]
 uuid = { version = "1.1.2", features = ["v4"] }
-
 syn = { version = "1.0.60", features = [
     "extra-traits",
     "full",

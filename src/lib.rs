@@ -132,7 +132,7 @@ mod tests {
     // cmk remove unwrap from examples and use ?
 
     #[test]
-    fn one_ndarray_usize_input_x() {
+    fn one_ndarray_usize_input() {
         #[anyinput]
         pub fn any_array_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
