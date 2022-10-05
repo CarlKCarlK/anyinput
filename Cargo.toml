@@ -2,10 +2,11 @@
 name = "anyinput"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 # cmk fill in more info
 
 [workspace]
-members = ["anyinput-derive"]
+members = ["anyinput-derive", "anyinput-helper"]
 
 [lib]
 
@@ -14,5 +15,5 @@ anyhow = "1.0"
 
 
 [dependencies]
-anyinput-derive = { path = "anyinput-derive" }
+anyinput-derive = { version = "0.1.0", path = "anyinput-derive" }
 ndarray = "0.15.4"

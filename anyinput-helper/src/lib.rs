@@ -371,6 +371,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
     match args {
         PathArguments::None => None,
         PathArguments::AngleBracketed(ref args) => {
+            // cmk might get this error if you forget to close a generic <>
             let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
             // cmk println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
@@ -937,4 +938,6 @@ mod tests {
             24
         );
     }
+    // cmk cargo test --workspace to test the whole workspace
+    // cmk use "https://github.com/crate-ci/cargo-release" to release workspace
 }

@@ -1,4 +1,4 @@
-// cmk rename to "anyinput"
+#![doc = include_str!("../README.md")]
 // cmk test what happens when you apply to non-functions (e.g. struct)
 #[cfg(test)]
 mod tests {
@@ -172,4 +172,17 @@ mod tests {
 
     // cmk must test badly-formed functions to see that the error messages make sense.
     // cmk is there a nice way to diff the output vs. the expected output?
+    // cmk rename helper as core
+    // cmk see for an example readme telling folks they likely want the main crate https://github.com/colin-kiegel/rust-derive-builder/tree/master/derive_builder_macro
 }
+
+// cmk understand this test from https://github.com/dtolnay/quote/blob/master/tests/test.rs
+// #[test]
+// fn test_substitution() {
+//     let x = X;
+//     let tokens = quote!(#x <#x> (#x) [#x] {#x});
+
+//     let expected = "X < X > (X) [X] { X }";
+
+//     assert_eq!(expected, tokens.to_string());
+// }
