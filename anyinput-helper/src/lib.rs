@@ -618,7 +618,7 @@ mod tests {
         pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
             i: AnyIter0,
         ) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
+            let i: <AnyIter0 as IntoIterator>::IntoIter = i.into_iter();
             let count = i.count();
             Ok(count)
         }
@@ -940,4 +940,31 @@ mod tests {
     }
     // cmk cargo test --workspace to test the whole workspace
     // cmk use "https://github.com/crate-ci/cargo-release" to release workspace
+
+    #[test]
+    fn doc_write() -> Result<(), anyhow::Error> {
+        let before = parse_quote! {
+        #[anyinput]
+        fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
+            Ok(s.len()+2)
+        }        };
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
+        println!("after: {}", quote! { #after});
+        let expected = parse_quote! {
+            fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+                let s = s.as_ref();
+                Ok(s.len() + 2)
+            }
+        };
+        assert_item_fn_eq(&after, &expected);
+
+        fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+            let s = s.as_ref();
+            Ok(s.len() + 2)
+        }
+
+        assert_eq!(len_plus_2("hello")?, 7);
+
+        Ok(())
+    }
 }

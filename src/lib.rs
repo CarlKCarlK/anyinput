@@ -170,6 +170,19 @@ mod tests {
         );
     }
 
+    #[test]
+    fn doc_ndarray() -> Result<(), anyhow::Error> {
+        #[anyinput]
+        fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
+            let mean = array.mean().unwrap();
+            Ok(mean)
+        }
+
+        assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
+        assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
+        Ok(())
+    }
+
     // cmk must test badly-formed functions to see that the error messages make sense.
     // cmk is there a nice way to diff the output vs. the expected output?
     // cmk rename helper as core
