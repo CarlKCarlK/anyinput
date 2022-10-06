@@ -172,14 +172,18 @@ mod tests {
 
     #[test]
     fn doc_ndarray() -> Result<(), anyhow::Error> {
+        use anyhow::Result;
+
         #[anyinput]
         fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
-            let mean = array.mean().unwrap();
+            let mean = array.mean().unwrap(); // cmk return error?
             Ok(mean)
         }
 
+        // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
         assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
         assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
+
         Ok(())
     }
 

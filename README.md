@@ -43,7 +43,8 @@ let input2: &String = &input;
 assert_eq!(len_plus_2(&input2)?, 7); // borrow a &String
 assert_eq!(len_plus_2(input2)?, 7); // move a &String
 assert_eq!(len_plus_2(input)?, 7); // move a String
-# Ok::<(), anyhow::Error>(()) // '#' needed for doctest
+# // '#' needed for doctest
+# Ok::<(), anyhow::Error>(())
 ```
 
 cmk format this code
@@ -67,7 +68,8 @@ assert_eq!(component_count("usr/files/home")?, 3);
 let path = Path::new("usr/files/home");
 assert_eq!(component_count(&path)?, 3);
 assert_eq!(component_count(path.to_path_buf())?, 3);
-# Ok::<(), anyhow::Error>(()) // '#' needed for doctest
+# // '#' needed for doctest
+# Ok::<(), anyhow::Error>(())
 ```
 
 Nesting and multiple AnyInputs are allowed. Here we create a function with two inputs. One input accepts any iterator-like
@@ -88,7 +90,8 @@ fn two_iterator_sum(iter1: AnyIter<usize>, iter2: AnyIter<AnyString>) -> Result<
     Ok(sum)
 }
 assert_eq!(two_iterator_sum(1..=10,["a","bb","ccc"])?, 61);
-# Ok::<(), anyhow::Error>(()) // '#' needed for doctest
+# // '#' needed for doctest
+# Ok::<(), anyhow::Error>(())
 ```
 
 Create a function that accepts an array-like thing of path-like things.
@@ -106,7 +109,8 @@ fn indexed_component_count(array: AnyArray<AnyPath>, index: usize) -> Result<usi
     Ok(count)
 }
 assert_eq!(indexed_component_count(vec!["usr/files/home","usr/data"], 1)?, 2);
-# Ok::<(), anyhow::Error>(()) // '#' needed for doctest
+# // '#' needed for doctest
+# Ok::<(), anyhow::Error>(())
 ```
 
 cmk todo do something interesting with 2d ndarray/views
@@ -116,19 +120,17 @@ Support for `NdArray` is provided by optional feature `ndarray`.
 
 ```rust
 use anyinput_derive::anyinput; //cmk need pass thru
-use anyhow::Result;
-use ndarray::array;
-
 #[anyinput]
 fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
-    let mean = array.mean().unwrap();
+    let mean = array.mean().unwrap(); // cmk return error?
     Ok(mean)
 }
 
 // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
 assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
 assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
-# Ok::<(), anyhow::Error>(()) // '#' needed for doctest
+# // '#' needed for doctest
+# Ok::<(), anyhow::Error>(())
 ```
 
 AnyInputs
@@ -159,7 +161,9 @@ How It Works
 The `#[anyinput]` macro uses standard Rust methods to support multiple input types. To do this, it
  rewrites your function with the appropriate generics. It also adds a line to your function to efficiently convert from the generic to the desired type. For example, it transforms `len_plus_2` from:
 
+
 ```rust
+use anyinput_derive::anyinput;
 #[anyinput]
 fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
     Ok(s.len()+2)

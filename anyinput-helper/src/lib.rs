@@ -944,7 +944,6 @@ mod tests {
     #[test]
     fn doc_write() -> Result<(), anyhow::Error> {
         let before = parse_quote! {
-        #[anyinput]
         fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
             Ok(s.len()+2)
         }        };
