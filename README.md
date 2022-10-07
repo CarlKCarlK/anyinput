@@ -24,7 +24,7 @@ Examples
 Create a function that adds 2 to the length of any string-like thing.
 
 ```rust
-use anyinput_derive::anyinput; //cmk need pass thru
+use anyinput::anyinput;
 use anyhow::Result;
 
 #[anyinput]
@@ -32,7 +32,7 @@ fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
     Ok(s.len()+2)
 }
 
-// By using 'AnyString', len_plus_2 works with
+// By using AnyString, len_plus_2 works with
 // &str, String, or &String -- borrowed or moved.
 assert_eq!(len_plus_2("Hello")?, 7); // move a &str
 let input: &str = "Hello";
@@ -52,7 +52,7 @@ cmk format this code
 Create a function that counts the components of any path-like thing.
 
 ```rust
-use anyinput_derive::anyinput; //cmk need pass thru
+use anyinput::anyinput;
 use anyhow::Result;
 use std::path::{PathBuf,Path};
 
@@ -62,7 +62,7 @@ fn component_count(path: AnyPath) -> Result<usize, anyhow::Error> {
     Ok(count)
 }
 
-// By using 'AnyPath', `component_count` works with any
+// By using AnyPath, component_count works with any
 // string-like or path-like thing, borrowed or moved.
 assert_eq!(component_count("usr/files/home")?, 3);
 let path = Path::new("usr/files/home");
@@ -73,10 +73,10 @@ assert_eq!(component_count(path.to_path_buf())?, 3);
 ```
 
 Nesting and multiple AnyInputs are allowed. Here we create a function with two inputs. One input accepts any iterator-like
-thing of `usize`. The second input accepts any iterator-like thing of string-like things and returns the sum of numbers and string lengths.
+thing of `usize`. The second input accepts any iterator-like thing of string-like things. The function returns the sum of the numbers and string lengths.
 
 ```rust
-use anyinput_derive::anyinput; //cmk need pass thru
+use anyinput::anyinput;
 use anyhow::Result;
 
 #[anyinput]
@@ -98,7 +98,7 @@ Create a function that accepts an array-like thing of path-like things.
 Return the number of path components at an index.
 
 ```rust
-use anyinput_derive::anyinput; //cmk need pass thru
+use anyinput::anyinput;
 use anyhow::Result;
 
 #[anyinput]
@@ -116,10 +116,10 @@ assert_eq!(indexed_component_count(vec!["usr/files/home","usr/data"], 1)?, 2);
 cmk todo do something interesting with 2d ndarray/views
 
 Create a function that accepts an `NdArray`-like thing of `f32`. Return the mean.
-Support for `NdArray` is provided by optional feature `ndarray`.
+Support for `NdArray` is provided by the optional feature `ndarray`.
 
 ```rust
-use anyinput_derive::anyinput; //cmk need pass thru
+use anyinput::anyinput;
 #[anyinput]
 fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
     let mean = array.mean().unwrap(); // cmk return error?
@@ -154,16 +154,19 @@ Notes & Features
   *  `.as_ref()` -- AnyString, AnyPath, AnyArray
   *  `.into_iter()` -- AnyIter
   *  `.into()` -- AnyNdArray
+* Easily apply `NdArray` functions to regular Rust arrays, slices, and `Vec`s.
+
+cmk give example of including NdArray feature.
 
 How It Works
 --------
 
-The `#[anyinput]` macro uses standard Rust methods to support multiple input types. To do this, it
- rewrites your function with the appropriate generics. It also adds a line to your function to efficiently convert from the generic to the desired type. For example, it transforms `len_plus_2` from:
-
+The `#[anyinput]` macro uses standard Rust generics to support multiple input types. To do this, it
+ rewrites your function with the appropriate generics. It also adds lines to your function to efficiently convert from the generic to the concrete type. For example, it transforms `len_plus_2` from:
 
 ```rust
-use anyinput_derive::anyinput;
+use anyinput::anyinput;
+
 #[anyinput]
 fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
     Ok(s.len()+2)
@@ -176,7 +179,9 @@ fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Er
     Ok(s.len() + 2)
 }
 ```
-As with all Rust generics, the compiler creates a separate function for each combination of concrete types by calling code.
+Here `AnyString0` is the generic type. The `as_ref()` line converts the generic to the concrete type.
+
+As with all Rust generics, the compiler creates a separate function for each combination of concrete types used by the calling code.
 
 
 Project Links cmk update

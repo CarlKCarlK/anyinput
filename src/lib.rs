@@ -1,5 +1,8 @@
 #![doc = include_str!("../README.md")]
 // cmk test what happens when you apply to non-functions (e.g. struct)
+
+pub use anyinput_derive::anyinput;
+
 #[cfg(test)]
 mod tests {
 
