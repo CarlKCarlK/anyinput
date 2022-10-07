@@ -26,17 +26,10 @@ pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
 }
 
-// #[proc_macro_attribute]
 pub fn anyinput(_args: TokenStream, input: TokenStream) -> TokenStream {
-    // panic!("input: {:#?}", &input);
-
     let old_item_fn = parse_macro_input!(input as ItemFn);
-    // panic!("input: {:#?}", &input);
-
     let mut generic_gen = generic_gen_simple_factory();
-
     let new_item_fn = transform_fn(old_item_fn, &mut generic_gen);
-
     TokenStream::from(quote!(#new_item_fn))
 }
 
@@ -64,26 +57,40 @@ impl Special {
         lifetime: Option<Lifetime>,
     ) -> GenericParam {
         match &self {
-            Special::AnyArray => {
-                let sub_type = sub_type.expect("array_1: sub_type");
-                parse_quote!(#new_type : AsRef<[#sub_type]>)
-            }
             Special::AnyString => {
-                assert!(sub_type.is_none(), "string should not have sub_type"); // cmk will this get checked in release?
+                if sub_type.is_some() {
+                    panic!("AnyString should not have a generic parameter, so AnyString, not AnyString<{}>.", quote!(#sub_type));
+                };
+                assert!(lifetime.is_none(), "AnyString should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<str>)
             }
             Special::AnyPath => {
-                assert!(sub_type.is_none(), "path should not have sub_type"); // cmk will this get checked in release?
+                if sub_type.is_some() {
+                    panic!(
+                        "AnyPath should not have a generic parameter, so AnyPath, not AnyPath<{}>.",
+                        quote!(#sub_type)
+                    );
+                };
+                assert!(lifetime.is_none(), "AnyPath should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<std::path::Path>)
             }
+            Special::AnyArray => {
+                let sub_type = sub_type.expect("AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.");
+                assert!(lifetime.is_none(), "AnyArray should not have a lifetime.");
+                parse_quote!(#new_type : AsRef<[#sub_type]>)
+            }
             Special::AnyIter => {
-                let sub_type = sub_type.expect("iter_1: sub_type");
+                let sub_type = sub_type.expect(
+                    "AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.",
+                );
+                assert!(lifetime.is_none(), "AnyIter should not have a lifetime.");
                 parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
             }
             Special::AnyNdArray => {
-                let sub_type = sub_type.expect("nd_array: sub_type");
+                let sub_type = sub_type.expect("AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.");
                 // cmk on other branches, check is None
-                let lifetime = lifetime.expect("nd_array: lifetime");
+                let lifetime =
+                    lifetime.expect("Internal error: AnyNdArray should be given a lifetime.");
                 parse_quote!(#new_type: Into<ndarray::ArrayView1<#lifetime, #sub_type>>)
             }
         }
@@ -176,7 +183,6 @@ impl Iterator for UuidGenerator {
 
     fn next(&mut self) -> Option<Self::Item> {
         let s = format!("{}_{}", self.uuid, self.counter);
-        // cmk00 let result = parse_str(&s).expect("parse failure"); // cmk
         self.counter += 1;
         Some(s)
     }
@@ -332,26 +338,31 @@ impl Fold for DeltaPatType<'_> {
         if let Some((segment, special)) = is_special_type_path(&type_path) {
             self.last_special = Some(special.clone()); // remember which kind of special found
 
-            let s0 = self.generic_gen.next().unwrap(); // Generate the generic type, e.g. S23
-            let s = format!("{:?}{}", &special, s0); // cmk implement display and remove "?"
-            type_path = parse_str(&s).expect("parse failure");
+            let suffix = self
+                .generic_gen
+                .next()
+                .expect("Internal error: ran out of generic suffixes");
+            let generic_name = format!("{:?}{}", &special, suffix); // cmk implement display and remove "?"
+            type_path =
+                parse_str(&generic_name).expect("Internal error: failed to parse generic name");
 
             // Define the generic type, e.g. S23: AsRef<str>, and remember it.
             let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
 
             let maybe_lifetime = if special.should_add_lifetime() {
-                // cmk do this better
-                let s = format!(
-                    "'{}{}",
-                    camel_case_to_snake_case(&format!("{:?}", &special)),
-                    &self.generic_gen.next().unwrap(),
-                );
-                let lifetime: Lifetime = parse_str(&s).expect("parse failure"); // cmk 9 rules: best & easy way to create an object?
+                let suffix = &self
+                    .generic_gen
+                    .next()
+                    .expect("Internal error: ran out of generic suffixes");
+                let snake_case = camel_case_to_snake_case(&format!("{:?}", &special));
+                let lifetime_name = format!("'{}{}", snake_case, suffix,);
+                // cmk 9 rules: best & easy way to create an object?
+                let lifetime: Lifetime = parse_str(&lifetime_name)
+                    .expect("Internal error: failed to parse lifetime name");
                 let generic_param: GenericParam = parse_quote! { #lifetime };
                 self.generic_params.push(generic_param);
-
+                // GenericParam::Lifetime(LifetimeDef::new(lifetime)); // cmk 9 rules: This is another way to create an object.
                 Some(lifetime)
-                //GenericParam::Lifetime(LifetimeDef::new(lifetime)); // cmk 9 rules: This is another way to create an object.
             } else {
                 None
             };
@@ -367,22 +378,30 @@ impl Fold for DeltaPatType<'_> {
     }
 }
 
+// cmk 9 rules: Return nice panics.
 fn has_sub_type(args: PathArguments) -> Option<Type> {
     match args {
         PathArguments::None => None,
         PathArguments::AngleBracketed(ref args) => {
-            // cmk might get this error if you forget to close a generic <>
-            let arg = first_and_only(args.args.iter()).expect("expected one argument cmk");
+            let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
+                panic!(
+                    "Expected at most one generic parameter, not '{}'",
+                    quote!(#args)
+                )
+            });
             // cmk println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
                 // cmk AnyIter<AnyPath>
                 Some(sub_type2.clone())
             } else {
-                panic!("expected GenericArgument::Type cmk");
+                panic!(
+                    "Expected generic parameter to be a type, not '{}'",
+                    quote!(#args)
+                )
             }
         }
         PathArguments::Parenthesized(_) => {
-            panic!("Parenthesized not supported")
+            panic!("Expected <..> generic parameter,  not '{}'", quote!(#args))
         }
     }
 }
@@ -966,4 +985,125 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    #[should_panic(
+        expected = "Expected at most one generic parameter, not '< AnyString0 , usize >'"
+    )]
+    fn one_bad_input() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyIter<AnyString,usize>) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+
+    #[test]
+    #[should_panic(expected = "Expected generic parameter to be a type, not '< 3 >'")]
+    fn one_bad_input_2() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyIter<3>) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+
+    #[test]
+    #[should_panic(expected = "Expected <..> generic parameter,  not '(AnyString0)'")]
+    fn one_bad_input_3() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyIter(AnyString)) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>."
+    )]
+    fn one_bad_input_4() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyArray) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>."
+    )]
+    fn one_bad_input_5() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyIter) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+    #[test]
+    #[should_panic(
+        expected = "AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>."
+    )]
+    fn one_bad_input_6() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyNdArray) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "AnyString should not have a generic parameter, so AnyString, not AnyString<usize>."
+    )]
+    fn one_bad_input_7() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyString<usize>) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "AnyPath should not have a generic parameter, so AnyPath, not AnyPath<usize>."
+    )]
+    fn one_bad_input_8() {
+        let before = parse_quote! {
+        pub fn any_str_len(s: AnyPath<usize>) -> Result<usize, anyhow::Error> {
+            let len = s.len();
+            Ok(len)
+        }
+           };
+        let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    }
+
+    // #[test]
+    // #[should_panic(
+    //     expected = "AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>."
+    // )]
+    // fn one_bad_input_9() {
+    //     let before = parse_quote! {
+    //     pub fn any_str_len<'a>(s: AnyNdArray<'a,usize>) -> Result<usize, anyhow::Error> {
+    //         let len = s.len();
+    //         Ok(len)
+    //     }
+    //        };
+    //     let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    // }
 }
