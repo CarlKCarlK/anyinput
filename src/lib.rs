@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
-/// Easily create functions that accept any type of string, path, iterator-like, or array-line inputs.
+/// Easily create functions that accept any type of string-, path-, iterator-, or array-like inputs.
 /// The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`.
 ///
 /// See the [documentation](https://docs.rs/anyinput/) for for details.
