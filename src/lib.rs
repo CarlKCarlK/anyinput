@@ -1,6 +1,35 @@
+#![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
-// cmk test what happens when you apply to non-functions (e.g. struct)
 
+/// Easily create functions that accept any type of string, path, iterator-like, or array-line inputs.
+/// The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`.
+///
+/// See the [documentation](https://docs.rs/anyinput/) for for details.
+///
+/// # Example
+/// ```
+/// use anyinput::anyinput;
+/// use anyhow::Result;
+///
+/// #[anyinput]
+/// fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
+///     Ok(s.len()+2)
+/// }
+///
+/// // By using AnyString, len_plus_2 works with
+/// // &str, String, or &String -- borrowed or moved.
+/// assert_eq!(len_plus_2("Hello")?, 7); // move a &str
+/// let input: &str = "Hello";
+/// assert_eq!(len_plus_2(&input)?, 7); // borrow a &str
+/// let input: String = "Hello".to_string();
+/// assert_eq!(len_plus_2(&input)?, 7); // borrow a String
+/// let input2: &String = &input;
+/// assert_eq!(len_plus_2(&input2)?, 7); // borrow a &String
+/// assert_eq!(len_plus_2(input2)?, 7); // move a &String
+/// assert_eq!(len_plus_2(input)?, 7); // move a String
+/// # // '# OK...' needed for doctest
+/// # Ok::<(), anyhow::Error>(())
+/// ```
 pub use anyinput_derive::anyinput;
 
 #[cfg(test)]
@@ -282,6 +311,19 @@ mod tests {
         assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
         Ok(())
     }
+
+    // todo make this a real test
+    // #[test]
+    // fn misapply() -> Result<(), anyhow::Error> {
+    //     use crate::anyinput;
+
+    //     #[anyinput]
+    //     struct Test {
+    //         a: AnyString,
+    //         b: AnyString,
+    //     }
+    //     Ok(())
+    // }
 
     // todo should their be a warning/error if there is no Anyinput on a function to which this has been applied?
     // todo must test badly-formed functions to see that the error messages make sense.
