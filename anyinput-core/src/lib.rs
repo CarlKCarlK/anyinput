@@ -1,11 +1,5 @@
-// todo rename to input-special-derive (or derive-input-special)
-// todo remove cargo stuff features of syn no longer needed.
 // todo use AST spans test so that problems with the user's syntax are reported correctly
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
-// todo add nice error enum
-
-// cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
-// https://docs.rs/syn/latest/syn/fold/index.html#example
 
 use std::str::FromStr;
 
@@ -19,8 +13,6 @@ use syn::{
     GenericArgument, GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType,
     PathArguments, PathSegment, Signature, Stmt, Type, TypePath,
 };
-// cmk use uuid::Uuid;
-
 pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
 }
@@ -41,6 +33,8 @@ enum Special {
     AnyIter,
     AnyNdArray,
 }
+
+// todo do something interesting with 2d ndarray/views
 
 impl Special {
     fn should_add_lifetime(&self) -> bool {
@@ -87,7 +81,6 @@ impl Special {
             }
             Special::AnyNdArray => {
                 let sub_type = sub_type.expect("AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.");
-                // cmk on other branches, check is None
                 let lifetime =
                     lifetime.expect("Internal error: AnyNdArray should be given a lifetime.");
                 parse_quote!(#new_type: Into<ndarray::ArrayView1<#lifetime, #sub_type>>)
@@ -224,8 +217,6 @@ impl DeltaFnArgs {
     }
 }
 
-// cmk see https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-nested-structs-and-enums
-
 #[derive(Debug)]
 // the new function input, any statements to add, and any new generic definitions.
 struct DeltaFnArg {
@@ -333,7 +324,7 @@ impl Fold for DeltaPatType<'_> {
                 .generic_gen
                 .next()
                 .expect("Internal error: ran out of generic suffixes");
-            let generic_name = format!("{:?}{}", &special, suffix); // cmk implement display and remove "?"
+            let generic_name = format!("{:?}{}", &special, suffix); // todo implement display and remove "?"
             type_path =
                 parse_str(&generic_name).expect("Internal error: failed to parse generic name");
 
@@ -351,7 +342,7 @@ impl Fold for DeltaPatType<'_> {
                     .expect("Internal error: failed to parse lifetime name");
                 let generic_param: GenericParam = parse_quote! { #lifetime };
                 self.generic_params.push(generic_param);
-                // GenericParam::Lifetime(LifetimeDef::new(lifetime)); // cmk 9 rules: This is another way to create an object.
+
                 Some(lifetime)
             } else {
                 None
@@ -378,9 +369,8 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
                     quote!(#args)
                 )
             });
-            // cmk println!("arg: {}", quote!(#arg));
+            // println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
-                // cmk AnyIter<AnyPath>
                 Some(sub_type2.clone())
             } else {
                 panic!(
@@ -849,7 +839,9 @@ mod tests {
         let after = transform_fn(before, &mut generic_gen_simple_factory());
         assert_item_fn_eq(&after, &expected);
 
-        // cmk clippy would like a comma after a:S0, but the macro doesn't do that.
+        // The lines are long enough that Clippy would like a comma after
+        // a:AnyNdArray0, but the macro doesn't do that because
+        // it doesn't know the line length.
         pub fn any_array_len<
             'any_nd_array1,
             AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>,

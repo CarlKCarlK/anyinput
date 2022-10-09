@@ -137,8 +137,6 @@ assert_eq!(
 # Ok::<(), anyhow::Error>(())
 ```
 
-cmk todo do something interesting with 2d ndarray/views
-
 You can easily apply `NdArray` functions to any array-like thing of numbers. For example, 
 here we create  a function that accepts an `NdArray`-like thing of `f32` and returns the mean.
 We apply the function to both a `Vec` and an `Array1<f32>`.

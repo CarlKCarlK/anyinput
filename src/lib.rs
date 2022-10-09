@@ -72,7 +72,7 @@ mod tests {
             let count = i.count();
             Ok(count)
         }
-        assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
+        assert_eq!(any_count_iter([1, 2, 3])?, 3);
         Ok(())
     }
 
@@ -83,7 +83,7 @@ mod tests {
             let count = i.count();
             Ok(count)
         }
-        assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
+        assert_eq!(any_count_iter([1, 2, 3])?, 3);
         Ok(())
     }
 
@@ -94,7 +94,7 @@ mod tests {
             let count = i.count();
             Ok(count)
         }
-        assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
+        assert_eq!(any_count_iter([1, 2, 3])?, 3);
         Ok(())
     }
 
@@ -105,7 +105,7 @@ mod tests {
             let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }
-        assert_eq!(any_count_iter(["a/b", "d"]).unwrap(), 3);
+        assert_eq!(any_count_iter(["a/b", "d"])?, 3);
         Ok(())
     }
 
@@ -116,11 +116,11 @@ mod tests {
             let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
             Ok(sum_count)
         }
-        assert_eq!(any_count_vec(vec!["a/b", "d"]).unwrap(), 3);
+        assert_eq!(any_count_vec(vec!["a/b", "d"])?, 3);
         Ok(())
     }
 
-    #[cfg(feature = "ndarray")] //cmk ndarray
+    #[cfg(feature = "ndarray")]
     #[test]
     fn one_array_usize_input() -> Result<(), anyhow::Error> {
         #[anyinput]
@@ -128,29 +128,25 @@ mod tests {
             let len = a.len();
             Ok(len)
         }
-        assert_eq!(any_array_len([1, 2, 3]).unwrap(), 3);
+        assert_eq!(any_array_len([1, 2, 3])?, 3);
         Ok(())
     }
 
-    // cmk remove unwrap from examples and use ?
-
     #[cfg(feature = "ndarray")]
     #[test]
-    fn one_ndarray_usize_input() {
+    fn one_ndarray_usize_input() -> Result<(), anyhow::Error> {
         #[anyinput]
         pub fn any_array_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
             Ok(len)
         }
-        assert_eq!(any_array_len([1, 2, 3].as_ref()).unwrap(), 3);
+        assert_eq!(any_array_len([1, 2, 3].as_ref())?, 3);
+        Ok(())
     }
-    // cmk remove "slice" from examples vocabulary
 
-    // cmk in readme.md mention that you'll get nice VC hints for the type.
-    // cmk add option into anyinput for long variables
     #[cfg(feature = "ndarray")]
     #[test]
-    fn complex() {
+    fn complex() -> Result<(), anyhow::Error> {
         #[anyinput]
         pub fn complex_total(
             a: usize,
@@ -169,10 +165,7 @@ mod tests {
             }
             Ok(total)
         }
-        assert_eq!(
-            complex_total(17, [vec![["one"]]], [1, 2, 3].as_ref()).unwrap(),
-            24
-        );
+        assert_eq!(complex_total(17, [vec![["one"]]], [1, 2, 3].as_ref())?, 24);
     }
 
     #[test]
@@ -182,8 +175,11 @@ mod tests {
 
         #[anyinput]
         fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
-            let mean = array.mean().unwrap(); // cmk return error?
-            Ok(mean)
+            if let mean = array.mean() {
+                Ok(mean)
+            } else {
+                Err(anyhow::anyhow!("empty array"))
+            }
         }
 
         // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
@@ -280,19 +276,6 @@ mod tests {
         Ok(())
     }
 
-    // cmk should their be a warning/error if there is no Anyinput on a function to which this has been applied?
-    // cmk must test badly-formed functions to see that the error messages make sense.
-    // cmk is there a nice way to diff the output vs. the expected output?
-    // cmk see for an example readme telling folks they likely want the main crate https://github.com/colin-kiegel/rust-derive-builder/tree/master/derive_builder_macro
+    // todo should their be a warning/error if there is no Anyinput on a function to which this has been applied?
+    // todo must test badly-formed functions to see that the error messages make sense.
 }
-
-// cmk understand this test from https://github.com/dtolnay/quote/blob/master/tests/test.rs
-// #[test]
-// fn test_substitution() {
-//     let x = X;
-//     let tokens = quote!(#x <#x> (#x) [#x] {#x});
-
-//     let expected = "X < X > (X) [X] { X }";
-
-//     assert_eq!(expected, tokens.to_string());
-// }
