@@ -1,6 +1,16 @@
 [package]
-name = "anyinput-derive"
 version = "0.1.0"
+name = "anyinput-derive"
+description = "Easily create functions that accept any type of string, path, iterator-like, or array-line inputs."
+repository = "https://github.com/CarlKCarlK/anyinput"
+readme = "README.md"
+documentation = "https://docs.rs/fetch-data/latest/anyinput/"
+authors = ["Carl Kadie"]
+exclude = []
+license = "MIT OR Apache-2.0"
+keywords = ["macros", "function", "generics", "ndarray", "iterator"]
+categories = ["development-tools", "rust-patterns"]
+homepage = "https://github.com/CarlKCarlK/anyinput"
 edition = "2021"
 
 [lib]

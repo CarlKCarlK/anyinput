@@ -1,6 +1,16 @@
 [package]
-name = "anyinput-core"
 version = "0.1.0"
+name = "anyinput-core"
+description = "Easily create functions that accept any type of string, path, iterator-like, or array-line inputs."
+repository = "https://github.com/CarlKCarlK/anyinput"
+readme = "README.md"
+documentation = "https://docs.rs/fetch-data/latest/anyinput/"
+authors = ["Carl Kadie"]
+exclude = []
+license = "MIT OR Apache-2.0"
+keywords = ["macros", "function", "generics", "ndarray", "iterator"]
+categories = ["development-tools", "rust-patterns"]
+homepage = "https://github.com/CarlKCarlK/anyinput"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,11 +29,7 @@ colored-diff = "0.2.3"
 
 [dependencies]
 # uuid = { version = "1.1.2", features = ["v4"] }
-syn = { version = "1.0.60", features = [
-    "extra-traits",
-    "full",
-    "fold",
-] }
+syn = { version = "1.0.60", features = ["extra-traits", "full", "fold"] }
 quote = "1.0.9"
 proc-macro2 = "1.0.24"
 strum = { version = "0.24", features = ["derive"] }
