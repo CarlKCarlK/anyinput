@@ -11,8 +11,6 @@ anyinput
 Easily create functions that accept any type of string-, path-, iterator-, or array-like inputs. The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`.
 
 ##### Contents
-- [anyinput](#anyinput)
-        - [Contents](#contents)
   - [Usage](#usage)
   - [Examples](#examples)
   - [The AnyInputs](#the-anyinputs)
