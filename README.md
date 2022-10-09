@@ -120,7 +120,8 @@ cmk todo do something interesting with 2d ndarray/views
 Create a function that accepts an `NdArray`-like thing of `f32`. Return the mean.
 Support for `NdArray` is provided by the optional feature `ndarray`.
 cmk ndarray
-```ignore
+```rust
+#[cfg(feature = "ndarray")]
 use anyinput::anyinput;
 #[anyinput]
 fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {

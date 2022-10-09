@@ -11,7 +11,7 @@ members = ["anyinput-derive", "anyinput-core"]
 [lib]
 
 [features]
-ndarray = ["dep:ndarray"]
+ndarray = ["dep:ndarray", "anyinput-derive/ndarray"]
 
 [dev-dependencies]
 anyhow = "1.0"
@@ -19,4 +19,4 @@ anyhow = "1.0"
 
 [dependencies]
 anyinput-derive = { version = "0.1.0", path = "anyinput-derive" }
-ndarray = {verion="0.15.4", optional=true}
+ndarray = { verion = "0.15.4", optional = true }
