@@ -1,6 +1,7 @@
 // todo use AST spans test so that problems with the user's syntax are reported correctly
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
+// todo could nested .as_ref(), .into_iter(), and .into() be replaced with a single method?
 use std::str::FromStr;
 
 use quote::quote;
