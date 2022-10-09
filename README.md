@@ -45,7 +45,7 @@ let input2: &String = &input;
 assert_eq!(len_plus_2(&input2)?, 7); // borrow a &String
 assert_eq!(len_plus_2(input2)?, 7); // move a &String
 assert_eq!(len_plus_2(input)?, 7); // move a String
-# // '#' needed for doctest
+# // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
 
@@ -70,7 +70,7 @@ assert_eq!(component_count("usr/files/home")?, 3);
 let path = Path::new("usr/files/home");
 assert_eq!(component_count(&path)?, 3);
 assert_eq!(component_count(path.to_path_buf())?, 3);
-# // '#' needed for doctest
+# // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
 
@@ -92,7 +92,7 @@ fn two_iterator_sum(iter1: AnyIter<usize>, iter2: AnyIter<AnyString>) -> Result<
     Ok(sum)
 }
 assert_eq!(two_iterator_sum(1..=10,["a","bb","ccc"])?, 61);
-# // '#' needed for doctest
+# // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
 
@@ -111,7 +111,7 @@ fn indexed_component_count(array: AnyArray<AnyPath>, index: usize) -> Result<usi
     Ok(count)
 }
 assert_eq!(indexed_component_count(vec!["usr/files/home","usr/data"], 1)?, 2);
-# // '#' needed for doctest
+# // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
 
@@ -121,8 +121,9 @@ Create a function that accepts an `NdArray`-like thing of `f32`. Return the mean
 Support for `NdArray` is provided by the optional feature `ndarray`.
 cmk ndarray
 ```rust
-#[cfg(feature = "ndarray")]
 use anyinput::anyinput;
+# // '#[cfg...' needed for doctest
+# #[cfg(feature = "ndarray")]
 #[anyinput]
 fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
     let mean = array.mean().unwrap(); // cmk return error?
@@ -130,9 +131,11 @@ fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
 }
 
 // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
+# #[cfg(feature = "ndarray")]
 assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
-// cmk ndarray assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
-# // '#' needed for doctest
+# #[cfg(feature = "ndarray")]
+assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
+# // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
 
