@@ -6,7 +6,6 @@
 
 // cmk Look more at https://github.com/dtolnay/syn/tree/master/examples/trace-var
 // https://docs.rs/syn/latest/syn/fold/index.html#example
-// cmk make nd support an optional feature
 
 use std::str::FromStr;
 
@@ -20,7 +19,7 @@ use syn::{
     GenericArgument, GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType,
     PathArguments, PathSegment, Signature, Stmt, Type, TypePath,
 };
-use uuid::Uuid;
+// cmk use uuid::Uuid;
 
 pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
@@ -158,35 +157,35 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
     }
 }
 
-pub struct UuidGenerator {
-    counter: usize,
-    uuid: String,
-}
+// pub struct UuidGenerator {
+//     counter: usize,
+//     uuid: String,
+// }
 
-impl Default for UuidGenerator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for UuidGenerator {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
 
-impl UuidGenerator {
-    pub fn new() -> Self {
-        Self {
-            uuid: Uuid::new_v4().to_string().replace('-', ""),
-            counter: 0,
-        }
-    }
-}
+// impl UuidGenerator {
+//     pub fn new() -> Self {
+//         Self {
+//             uuid: Uuid::new_v4().to_string().replace('-', ""),
+//             counter: 0,
+//         }
+//     }
+// }
 
-impl Iterator for UuidGenerator {
-    type Item = String;
+// impl Iterator for UuidGenerator {
+//     type Item = String;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let s = format!("{}_{}", self.uuid, self.counter);
-        self.counter += 1;
-        Some(s)
-    }
-}
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let s = format!("{}_{}", self.uuid, self.counter);
+//         self.counter += 1;
+//         Some(s)
+//     }
+// }
 
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     let first = iter.next()?;
@@ -218,15 +217,7 @@ struct DeltaFnArgs {
 impl DeltaFnArgs {
     fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
-        // cmk
-        // if !self.fn_args.empty_or_trailing() {
-        //     self.fn_args.push_punct(Comma::default());
-        // }
         self.generic_params.extend(delta_fn_arg.generic_params);
-        // cmk
-        // if !self.generic_params.empty_or_trailing() && self.generic_params.len() > 1 {
-        //     self.generic_params.push_punct(Comma::default());
-        // }
         for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
             self.stmts.insert(index, stmt);
         }
@@ -329,7 +320,7 @@ fn camel_case_to_snake_case(s: &str) -> String {
 
 impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path: TypePath) -> TypePath {
-        // cmk println!("fold_type_path (before): {:?}", quote!(#type_path));
+        // println!("fold_type_path (before): {:?}", quote!(#type_path));
 
         // Search for any special (sub)subtypes, replacing them with generics.
         let mut type_path = fold_type_path(self, type_path);
@@ -356,7 +347,6 @@ impl Fold for DeltaPatType<'_> {
                     .expect("Internal error: ran out of generic suffixes");
                 let snake_case = camel_case_to_snake_case(&format!("{:?}", &special));
                 let lifetime_name = format!("'{}{}", snake_case, suffix,);
-                // cmk 9 rules: best & easy way to create an object?
                 let lifetime: Lifetime = parse_str(&lifetime_name)
                     .expect("Internal error: failed to parse lifetime name");
                 let generic_param: GenericParam = parse_quote! { #lifetime };
@@ -373,12 +363,11 @@ impl Fold for DeltaPatType<'_> {
         } else {
             self.last_special = None;
         }
-        // cmk println!("fold_type_path (after): {}", quote!(#type_path));
+        // println!("fold_type_path (after): {}", quote!(#type_path));
         type_path
     }
 }
 
-// cmk 9 rules: Return nice panics.
 fn has_sub_type(args: PathArguments) -> Option<Type> {
     match args {
         PathArguments::None => None,
@@ -421,8 +410,7 @@ fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> 
 
 #[cfg(test)]
 mod tests {
-    // cmk 9 rules prettyplease::unparse vs quote! trick
-    use crate::{generic_gen_simple_factory, transform_fn, DeltaPatType, UuidGenerator};
+    use crate::{generic_gen_simple_factory, transform_fn, DeltaPatType};
     use quote::quote;
     use syn::{fold::Fold, parse_quote, ItemFn};
     #[cfg(feature = "ndarray")]
@@ -450,14 +438,14 @@ mod tests {
         panic!("after != expected");
     }
 
-    #[test]
-    fn uuid() {
-        let mut uuid_generator = UuidGenerator::new();
-        for i in 0..10 {
-            let _ = uuid_generator.next();
-            println!("{:#?}", i);
-        }
-    }
+    // #[test]
+    // fn uuid() {
+    //     let mut uuid_generator = UuidGenerator::new();
+    //     for i in 0..10 {
+    //         let _ = uuid_generator.next();
+    //         println!("{:#?}", i);
+    //     }
+    // }
 
     #[test]
     fn one_input() {
@@ -775,17 +763,8 @@ mod tests {
         assert_eq!(any_count_vec(vec!["a/b", "d"]).unwrap(), 3);
     }
 
-    // cmk see https://quodlibetor.github.io/posts/debugging-rusts-new-custom-derive-system/
-    // cmk syn's readme says "Consider using the trybuild crate to write tests for errors that
-    //    are emitted by your macro or errors detected by the Rust compiler in the expanded code
-    //    following misuse of the macro. Such tests help avoid regressions from later refactors
-    //    that mistakenly make an error no longer trigger or be less helpful than it used to be.
-
     #[test]
     fn fold_one_path() {
-        // cmk 9 rules: parse_quote!
-        // cmk 9 rules: use format!(quote!()) to generate strings of code
-        // cmk 9 rules quote! is a nice way to display short ASTs on one line, too
         let before = parse_quote! {AnyIter<AnyPath> };
         println!("before: {}", quote!(before));
         let mut gen = generic_gen_simple_factory();
@@ -968,8 +947,6 @@ mod tests {
             24
         );
     }
-    // cmk cargo test --workspace to test the whole workspace
-    // cmk use "https://github.com/crate-ci/cargo-release" to release workspace
 
     #[test]
     fn doc_write() -> Result<(), anyhow::Error> {

@@ -19,8 +19,6 @@ Easily create functions that accept any type of string, path, iterator-like, or 
   - [Project Links](#project-links)
 
 
-cmk create tiny readme's for the other two crates.
-
 Usage
 -----
 
