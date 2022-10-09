@@ -1,5 +1,5 @@
 [package]
-version = "0.1.1"
+version = "0.1.2"
 name = "anyinput-derive"
 description = "Easily create functions that accept any type of string-, path-, iterator-, or array-like inputs."
 repository = "https://github.com/CarlKCarlK/anyinput"
@@ -20,4 +20,4 @@ proc-macro = true
 ndarray = ["anyinput-core/ndarray"]
 
 [dependencies]
-anyinput-core = { version = "0.1.0", path = "../anyinput-core" }
+anyinput-core = { version = "0.1.2", path = "../anyinput-core" }

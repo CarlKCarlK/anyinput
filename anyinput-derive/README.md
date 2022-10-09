@@ -7,8 +7,8 @@ anyinput-derive
 
 **Important Note**:
 
-* You are probably looking for the [`anyinput`] crate, which wraps this crate and is much more ergonomic to use.
+* You are probably looking for the [`anyinput`](https://docs.rs/anyinput/) crate, which wraps this crate and is much more ergonomic to use.
 
 ## Purpose
 
-This is an internal helper library of [`anyinput`].
+This is an internal helper library of [`anyinput`](https://docs.rs/anyinput/).
