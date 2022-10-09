@@ -24,6 +24,7 @@ ndarray = ["anyinput-derive/ndarray"]
 
 [dev-dependencies]
 anyhow = "1.0"
+ndarray = { version = "0.15" }
 
 [dependencies]
 anyinput-derive = { version = "0.1.0", path = "anyinput-derive" }

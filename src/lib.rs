@@ -135,6 +135,8 @@ mod tests {
     #[cfg(feature = "ndarray")]
     #[test]
     fn one_ndarray_usize_input() -> Result<(), anyhow::Error> {
+        use ndarray;
+
         #[anyinput]
         pub fn any_array_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
             let len = a.len();
@@ -147,6 +149,8 @@ mod tests {
     #[cfg(feature = "ndarray")]
     #[test]
     fn complex() -> Result<(), anyhow::Error> {
+        use ndarray;
+
         #[anyinput]
         pub fn complex_total(
             a: usize,
@@ -166,16 +170,18 @@ mod tests {
             Ok(total)
         }
         assert_eq!(complex_total(17, [vec![["one"]]], [1, 2, 3].as_ref())?, 24);
+        Ok(())
     }
 
     #[test]
     #[cfg(feature = "ndarray")]
     fn doc_ndarray() -> Result<(), anyhow::Error> {
         use anyhow::Result;
+        use ndarray;
 
         #[anyinput]
         fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
-            if let mean = array.mean() {
+            if let Some(mean) = array.mean() {
                 Ok(mean)
             } else {
                 Err(anyhow::anyhow!("empty array"))
@@ -260,6 +266,7 @@ mod tests {
     fn doc_ndarray2() -> Result<(), anyhow::Error> {
         use crate::anyinput;
         use anyhow::Result;
+        use ndarray;
 
         #[anyinput]
         fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {

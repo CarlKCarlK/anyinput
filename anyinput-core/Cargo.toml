@@ -33,4 +33,4 @@ syn = { version = "1.0.60", features = ["extra-traits", "full", "fold"] }
 quote = "1.0.9"
 proc-macro2 = "1.0.24"
 strum = { version = "0.24", features = ["derive"] }
-ndarray = { verion = "0.15.4", optional = true }
+ndarray = { version = "0.15.4", optional = true }
