@@ -6,17 +6,19 @@ cmk[<img alt="github" src="https://img.shields.io/badge/github-bed--reader-8da0c
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-bed--reader-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/bed-reader)
 [<img alt="build status" src="https://img.shields.io/github/workflow/status/fastlmm/bed-reader/CI/master?style=for-the-badge" height="20">](https://github.com/fastlmm/bed-reader/actions?query=branch%3Amaster)
 
-Easily create functions that accept any type of string, path, iterator-like, or array-line inputs.
+Easily create functions that accept any type of string, path, iterator-like, or array-line inputs. The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`.
 
 ##### Contents
 - [anyinput](#anyinput)
         - [Contents](#contents)
   - [Examples](#examples)
-  - [AnyInputs](#anyinputs)
+  - [The AnyInputs](#the-anyinputs)
   - [Notes & Features](#notes--features)
   - [How It Works](#how-it-works)
   - [Project Links cmk update](#project-links-cmk-update)
 
+
+cmk create tiny readme's for the other two crates.
 
 Examples
 --------
@@ -117,8 +119,8 @@ cmk todo do something interesting with 2d ndarray/views
 
 Create a function that accepts an `NdArray`-like thing of `f32`. Return the mean.
 Support for `NdArray` is provided by the optional feature `ndarray`.
-
-```rust
+cmk ndarray
+```ignore
 use anyinput::anyinput;
 #[anyinput]
 fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
@@ -128,12 +130,12 @@ fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
 
 // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
 assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
-assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
+// cmk ndarray assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
 # // '#' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
 
-AnyInputs
+The AnyInputs
 ---------
 
 | AnyInput   | Description                            | Creates Concrete Type           |

@@ -6,9 +6,8 @@ pub use anyinput_derive::anyinput;
 #[cfg(test)]
 mod tests {
 
+    use crate::anyinput;
     use std::path::PathBuf;
-
-    use anyinput_derive::anyinput;
 
     #[test]
     fn one_input() -> Result<(), anyhow::Error> {
@@ -121,6 +120,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "ndarray")] //cmk ndarray
     #[test]
     fn one_array_usize_input() -> Result<(), anyhow::Error> {
         #[anyinput]
@@ -134,6 +134,7 @@ mod tests {
 
     // cmk remove unwrap from examples and use ?
 
+    #[cfg(feature = "ndarray")]
     #[test]
     fn one_ndarray_usize_input() {
         #[anyinput]
@@ -147,6 +148,7 @@ mod tests {
 
     // cmk in readme.md mention that you'll get nice VC hints for the type.
     // cmk add option into anyinput for long variables
+    #[cfg(feature = "ndarray")]
     #[test]
     fn complex() {
         #[anyinput]
@@ -174,6 +176,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "ndarray")]
     fn doc_ndarray() -> Result<(), anyhow::Error> {
         use anyhow::Result;
 
@@ -190,9 +193,10 @@ mod tests {
         Ok(())
     }
 
+
+    // cmk should their be a warning/error if there is no Anyinput on a function to which this has been applied?
     // cmk must test badly-formed functions to see that the error messages make sense.
     // cmk is there a nice way to diff the output vs. the expected output?
-    // cmk rename helper as core
     // cmk see for an example readme telling folks they likely want the main crate https://github.com/colin-kiegel/rust-derive-builder/tree/master/derive_builder_macro
 }
 

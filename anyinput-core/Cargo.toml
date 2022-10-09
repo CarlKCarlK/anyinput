@@ -1,11 +1,15 @@
 [package]
-name = "anyinput-helper"
+name = "anyinput-core"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
+
+[features]
+ndarray = ["dep:ndarray"]
+
 
 [dev-dependencies]
 # cmk understand what trybuild does
@@ -24,4 +28,4 @@ syn = { version = "1.0.60", features = [
 quote = "1.0.9"
 proc-macro2 = "1.0.24"
 strum = { version = "0.24", features = ["derive"] }
-ndarray = "0.15.4" # make a feature
+ndarray = {verion="0.15.4", optional=true}

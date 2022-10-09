@@ -424,7 +424,9 @@ mod tests {
     // cmk 9 rules prettyplease::unparse vs quote! trick
     use crate::{generic_gen_simple_factory, transform_fn, DeltaPatType, UuidGenerator};
     use quote::quote;
-    use syn::{fold::Fold, parse_quote, GenericParam, ItemFn, Lifetime};
+    use syn::{fold::Fold, parse_quote, ItemFn};
+    #[cfg(feature = "ndarray")]
+    use syn::{GenericParam, Lifetime};
 
     fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
         if after == expected {
@@ -773,6 +775,12 @@ mod tests {
         assert_eq!(any_count_vec(vec!["a/b", "d"]).unwrap(), 3);
     }
 
+    // cmk see https://quodlibetor.github.io/posts/debugging-rusts-new-custom-derive-system/
+    // cmk syn's readme says "Consider using the trybuild crate to write tests for errors that
+    //    are emitted by your macro or errors detected by the Rust compiler in the expanded code
+    //    following misuse of the macro. Such tests help avoid regressions from later refactors
+    //    that mistakenly make an error no longer trigger or be less helpful than it used to be.
+
     #[test]
     fn fold_one_path() {
         // cmk 9 rules: parse_quote!
@@ -825,6 +833,7 @@ mod tests {
         assert_eq!(any_array_len([1, 2, 3]).unwrap(), 3);
     }
 
+    #[cfg(feature = "ndarray")]
     #[test]
     fn understand_lifetime_parse() {
         let a = Lifetime::new("'a", syn::__private::Span::call_site());
@@ -837,6 +846,7 @@ mod tests {
         println!("done");
     }
 
+    #[cfg(feature = "ndarray")]
     #[test]
     fn one_ndarray_usize_input() {
         let before = parse_quote! {
@@ -875,6 +885,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "ndarray")]
     fn complex() {
         let before = parse_quote! {
             pub fn complex_total(

@@ -6,6 +6,9 @@ edition = "2021"
 [lib]
 proc-macro = true
 
+[features]
+ndarray = ["dep:ndarray"]
+
 [dev-dependencies]
 # cmk understand what trybuild does
 trybuild = { version = "1.0", features = ["diff"] }
@@ -25,5 +28,5 @@ syn = { version = "1.0.60", features = [
     "derive",
 ] }
 strum = { version = "0.24", features = ["derive"] }
-ndarray = "0.15.4" # make a feature
-anyinput-helper = { version = "0.1.0", path = "../anyinput-helper" }
+ndarray = {verion="0.15.4", optional=true}
+anyinput-core = { version = "0.1.0", path = "../anyinput-core" }
