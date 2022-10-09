@@ -1,9 +1,9 @@
 anyinput
 ==========
 
-[<img alt="github" src="https://img.shields.io/badge/github-fetch--data-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/CarlKCarlK/anyinput)
+[<img alt="github" src="https://img.shields.io/badge/github-anyinput-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/CarlKCarlK/anyinput)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/anyinput.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/anyinput)
-[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-fetch--data-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/anyinput)
+[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-anyinput-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/anyinput)
 [<img alt="build status" src="https://img.shields.io/github/workflow/status/CarlKCarlK/anyinput/CI/master?style=for-the-badge" height="20">](https://github.com/CarlKCarlk/anyinput)
 
 Easily create functions that accept any type of string, path, iterator-like, or array-line inputs. The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`.
@@ -11,19 +11,32 @@ Easily create functions that accept any type of string, path, iterator-like, or 
 ##### Contents
 - [anyinput](#anyinput)
         - [Contents](#contents)
+  - [Usage](#usage)
   - [Examples](#examples)
   - [The AnyInputs](#the-anyinputs)
   - [Notes & Features](#notes--features)
   - [How It Works](#how-it-works)
-  - [Project Links cmk update](#project-links-cmk-update)
+  - [Project Links](#project-links)
 
 
 cmk create tiny readme's for the other two crates.
 
+Usage
+-----
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+anyinput = { version = "0.1", features = ["ndarray"] }
+```
+
+If you don't need `NdArray` support, omit the `ndarray` feature.
+
 Examples
 --------
 
-Create a function that adds 2 to the length of any string-like thing.
+Create a function that adds `2` to the length of any string-like thing.
 
 ```rust
 use anyinput::anyinput;
@@ -49,14 +62,12 @@ assert_eq!(len_plus_2(input)?, 7); // move a String
 # Ok::<(), anyhow::Error>(())
 ```
 
-cmk format this code
-
 Create a function that counts the components of any path-like thing.
 
 ```rust
 use anyinput::anyinput;
 use anyhow::Result;
-use std::path::{PathBuf,Path};
+use std::path::Path;
 
 #[anyinput]
 fn component_count(path: AnyPath) -> Result<usize, anyhow::Error> {
@@ -69,7 +80,8 @@ fn component_count(path: AnyPath) -> Result<usize, anyhow::Error> {
 assert_eq!(component_count("usr/files/home")?, 3);
 let path = Path::new("usr/files/home");
 assert_eq!(component_count(&path)?, 3);
-assert_eq!(component_count(path.to_path_buf())?, 3);
+let pathbuf = path.to_path_buf();
+assert_eq!(component_count(pathbuf)?, 3);
 # // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
@@ -77,21 +89,26 @@ assert_eq!(component_count(path.to_path_buf())?, 3);
 Nesting and multiple AnyInputs are allowed. Here we create a function with two inputs. One input accepts any iterator-like
 thing of `usize`. The second input accepts any iterator-like thing of string-like things. The function returns the sum of the numbers and string lengths.
 
+We apply the function to the range `1..=10` and a slice of `&str`'s.
+
 ```rust
 use anyinput::anyinput;
 use anyhow::Result;
 
 #[anyinput]
-fn two_iterator_sum(iter1: AnyIter<usize>, iter2: AnyIter<AnyString>) -> Result<usize, anyhow::Error> {
+fn two_iterator_sum(
+    iter1: AnyIter<usize>,
+    iter2: AnyIter<AnyString>,
+) -> Result<usize, anyhow::Error> {
     let mut sum = iter1.sum();
-    for any_string in iter2
-    {
+    for any_string in iter2 {
         // Needs .as_ref to turn the nested AnyString into a &str.
         sum += any_string.as_ref().len();
     }
     Ok(sum)
 }
-assert_eq!(two_iterator_sum(1..=10,["a","bb","ccc"])?, 61);
+
+assert_eq!(two_iterator_sum(1..=10, ["a", "bb", "ccc"])?, 61);
 # // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
@@ -104,35 +121,49 @@ use anyinput::anyinput;
 use anyhow::Result;
 
 #[anyinput]
-fn indexed_component_count(array: AnyArray<AnyPath>, index: usize) -> Result<usize, anyhow::Error> {
+fn indexed_component_count(
+    array: AnyArray<AnyPath>,
+    index: usize,
+) -> Result<usize, anyhow::Error> {
     // Needs .as_ref to turn the nested AnyPath into a &Path.
     let path = array[index].as_ref();
     let count = path.iter().count();
     Ok(count)
 }
-assert_eq!(indexed_component_count(vec!["usr/files/home","usr/data"], 1)?, 2);
+
+assert_eq!(
+    indexed_component_count(vec!["usr/files/home", "usr/data"], 1)?,
+    2
+);
 # // '# OK...' needed for doctest
 # Ok::<(), anyhow::Error>(())
 ```
 
 cmk todo do something interesting with 2d ndarray/views
 
-Create a function that accepts an `NdArray`-like thing of `f32`. Return the mean.
+You can easily apply `NdArray` functions to any array-like thing of numbers. For example, 
+here we create  a function that accepts an `NdArray`-like thing of `f32` and returns the mean.
+We apply the function to both a `Vec` and an `Array1<f32>`.
+
 Support for `NdArray` is provided by the optional feature `ndarray`.
-cmk ndarray
 ```rust
 use anyinput::anyinput;
+use anyhow::Result;
+
 # // '#[cfg...' needed for doctest
 # #[cfg(feature = "ndarray")]
 #[anyinput]
 fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
-    let mean = array.mean().unwrap(); // cmk return error?
-    Ok(mean)
+    if let Some(mean) = array.mean() {
+        Ok(mean)
+    } else {
+        Err(anyhow::anyhow!("empty array"))
+    }
 }
 
 // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
 # #[cfg(feature = "ndarray")]
-assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
+assert_eq!(any_mean(&vec![10.0, 20.0, 30.0, 40.0])?, 25.0);
 # #[cfg(feature = "ndarray")]
 assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
 # // '# OK...' needed for doctest
@@ -153,22 +184,24 @@ The AnyInputs
 Notes & Features
 --------
 
+* Feature requests and contributions are welcome.
 * Works with nesting, multiple inputs, and generics.
 * Automatically and efficiently converts an top-level AnyInput into a concrete type.
-* An array or iterator of, for example, `AnyString` must resolve to the same string type. So, you can have a vector of all `&str` or all `String`, but not mixed. This hold true for all AnyInputs.
+* Elements of AnyArray, AnyIter, and AnyNdArray must be a single type. So, `AnyArray<AnyString>` 
+  accepts a vector of all `&str` or all `String`, but not mixed.
 * When nesting, efficiently convert the nested AnyInput to the concrete type with
   *  `.as_ref()` -- AnyString, AnyPath, AnyArray
   *  `.into_iter()` -- AnyIter
   *  `.into()` -- AnyNdArray
-* Easily apply `NdArray` functions to regular Rust arrays, slices, and `Vec`s.
 
-cmk give example of including NdArray feature.
+  (The iterator and array examples above show this.)
+* Let's you easily apply `NdArray` functions to regular Rust arrays, slices, and `Vec`s.
 
 How It Works
 --------
 
 The `#[anyinput]` macro uses standard Rust generics to support multiple input types. To do this, it
- rewrites your function with the appropriate generics. It also adds lines to your function to efficiently convert from the generic to the concrete type. For example, it transforms `len_plus_2` from:
+ rewrites your function with the appropriate generics. It also adds lines to your function to efficiently convert from any top-level generic to a concrete type. For example, the macro transforms `len_plus_2` from:
 
 ```rust
 use anyinput::anyinput;
@@ -185,19 +218,16 @@ fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Er
     Ok(s.len() + 2)
 }
 ```
-Here `AnyString0` is the generic type. The `as_ref()` line converts the generic to the concrete type.
+Here `AnyString0` is the generic type. The line `let s = s.as_ref()` converts from generic type `AnyString0` to concrete type `&str`.
 
 As with all Rust generics, the compiler creates a separate function for each combination of concrete types used by the calling code.
 
 
-Project Links cmk update
+Project Links
 -----
 
-* [**Installation**](https://crates.io/crates/bed-reader)
-* [**Documentation**](https://docs.rs/bed-reader/)
-* [**Questions via email**](mailto://fastlmm-dev@python.org)
-* [**Source code**](https://github.com/fastlmm/bed-reader)
-* [**Discussion**](https://github.com/fastlmm/bed-reader/discussions/)
-* [**Bug Reports**](https://github.com/fastlmm/bed-reader/issues)
-* [**Project Website**](https://fastlmm.github.io/)
-
+* [**Installation**](https://crates.io/crates/anyinput)
+* [**Documentation**](https://docs.rs/anyinput/)
+* [**Source code**](https://github.com/CarlKCarlK/anyinput)
+* [**Discussion**](https://github.com/CarlKCarlK/anyinput/discussions/)
+* [**Bug Reports and Feature Requests**](https://github.com/CarlKCarlK/anyinput/issues)

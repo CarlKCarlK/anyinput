@@ -193,6 +193,92 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn doc_path() -> Result<(), anyhow::Error> {
+        use crate::anyinput;
+        use anyhow::Result;
+        use std::path::Path;
+
+        #[anyinput]
+        fn component_count(path: AnyPath) -> Result<usize, anyhow::Error> {
+            let count = path.iter().count();
+            Ok(count)
+        }
+
+        // By using AnyPath, component_count works with any
+        // string-like or path-like thing, borrowed or moved.
+        assert_eq!(component_count("usr/files/home")?, 3);
+        let path = Path::new("usr/files/home");
+        let pathbuf = path.to_path_buf();
+        assert_eq!(component_count(&path)?, 3);
+        assert_eq!(component_count(pathbuf)?, 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn doc_iter() -> Result<(), anyhow::Error> {
+        use crate::anyinput;
+        use anyhow::Result;
+
+        #[anyinput]
+        fn two_iterator_sum(
+            iter1: AnyIter<usize>,
+            iter2: AnyIter<AnyString>,
+        ) -> Result<usize, anyhow::Error> {
+            let mut sum = iter1.sum();
+            for any_string in iter2 {
+                // Needs .as_ref to turn the nested AnyString into a &str.
+                sum += any_string.as_ref().len();
+            }
+            Ok(sum)
+        }
+        assert_eq!(two_iterator_sum(1..=10, ["a", "bb", "ccc"])?, 61);
+        Ok(())
+    }
+
+    #[test]
+    fn doc_array() -> Result<(), anyhow::Error> {
+        use crate::anyinput;
+        use anyhow::Result;
+
+        #[anyinput]
+        fn indexed_component_count(
+            array: AnyArray<AnyPath>,
+            index: usize,
+        ) -> Result<usize, anyhow::Error> {
+            // Needs .as_ref to turn the nested AnyPath into a &Path.
+            let path = array[index].as_ref();
+            let count = path.iter().count();
+            Ok(count)
+        }
+        assert_eq!(
+            indexed_component_count(vec!["usr/files/home", "usr/data"], 1)?,
+            2
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "ndarray")]
+    fn doc_ndarray2() -> Result<(), anyhow::Error> {
+        use crate::anyinput;
+        use anyhow::Result;
+
+        #[anyinput]
+        fn any_mean(array: AnyNdArray<f32>) -> Result<f32, anyhow::Error> {
+            if let Some(mean) = array.mean() {
+                Ok(mean)
+            } else {
+                Err(anyhow::anyhow!("empty array"))
+            }
+        }
+
+        // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
+        assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
+        assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
+        Ok(())
+    }
 
     // cmk should their be a warning/error if there is no Anyinput on a function to which this has been applied?
     // cmk must test badly-formed functions to see that the error messages make sense.
