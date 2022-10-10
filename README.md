@@ -39,6 +39,9 @@ If you don't need `NdArray` support, omit the `ndarray` feature.
 Examples
 --------
 
+We'll start with examples that are so simple that you may not need the macro.
+We want to show that simple examples stay simple.
+
 Create a function that adds `2` to the length of any string-like thing.
 
 ```rust
@@ -65,7 +68,7 @@ assert_eq!(len_plus_2(input)?, 7); // move a String
 # Ok::<(), anyhow::Error>(())
 ```
 
-Create a function that counts the components of any path-like thing.
+Another simple example: Create a function that counts the components of any path-like thing.
 
 ```rust
 use anyinput::anyinput;
@@ -89,7 +92,8 @@ assert_eq!(component_count(pathbuf)?, 3);
 # Ok::<(), anyhow::Error>(())
 ```
 
-Nesting and multiple AnyInputs are allowed. Here we create a function with two inputs. One input accepts any iterator-like
+As we add nesting and multiple inputs, the macro becomes more useful.
+Here we create a function with two inputs. One input accepts any iterator-like
 thing of `usize`. The second input accepts any iterator-like thing of string-like things. The function returns the sum of the numbers and string lengths.
 
 We apply the function to the range `1..=10` and a slice of `&str`'s.
