@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use anyinput_core::anyinput as anyinput_internal;
 use proc_macro::TokenStream;
 

@@ -26,7 +26,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anyinput = { version = "0.1.2", features = ["ndarray"] }
+anyinput = { version = "0.1.3", features = ["ndarray"] }
 ```
 
 If you don't need `NdArray` support, omit the `ndarray` feature.
@@ -192,6 +192,7 @@ Notes & Features
 
   (The iterator and array examples above show this.)
 * Let's you easily apply `NdArray` functions to regular Rust arrays, slices, and `Vec`s.
+* Used by the [bed-reader](https://docs.rs/bed-reader/latest/bed_reader/) genomics crate.
 
 How It Works
 --------

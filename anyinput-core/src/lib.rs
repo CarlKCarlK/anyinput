@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 // todo use AST spans test so that problems with the user's syntax are reported correctly
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
