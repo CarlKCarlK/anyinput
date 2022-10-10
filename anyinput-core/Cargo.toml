@@ -1,7 +1,7 @@
 [package]
-version = "0.1.3"
+version = "0.1.4"
 name = "anyinput-core"
-description = "Easily create functions that accept any type of string-, path-, iterator-, or array-like inputs."
+description = "A macro for easier writing of functions that accept any string-, path-, iterator-, array-, or ndarray-like input."
 repository = "https://github.com/CarlKCarlK/anyinput"
 readme = "README.md"
 documentation = "https://docs.rs/fetch-data/latest/anyinput/"

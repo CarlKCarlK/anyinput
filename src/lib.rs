@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
-/// Easily create functions that accept any type of string-, path-, iterator-, or array-like inputs.
+/// A macro for easier writing of functions that accept any string-, path-, iterator-, array-, or ndarray-like input.
 /// The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`.
 ///
 /// See the [documentation](https://docs.rs/anyinput/) for for details.
@@ -309,6 +309,84 @@ mod tests {
         // 'AnyNdArray' works with any 1-D array-like thing, but must be borrowed.
         assert_eq!(any_mean(&[10.0, 20.0, 30.0, 40.0])?, 25.0);
         assert_eq!(any_mean(&ndarray::array![10.0, 20.0, 30.0, 40.0])?, 25.0);
+        Ok(())
+    }
+
+    #[test]
+    fn more_path() -> Result<(), anyhow::Error> {
+        use crate::anyinput;
+        use anyhow::Result;
+        use std::path::Path;
+
+        fn component_count1(path: impl AsRef<Path>) -> Result<usize, anyhow::Error> {
+            let path = path.as_ref();
+            Ok(path.iter().count())
+        }
+        assert_eq!(component_count1("usr/files/home")?, 3);
+
+        #[anyinput]
+        fn component_count2(path: AnyPath) -> Result<usize, anyhow::Error> {
+            Ok(path.iter().count())
+        }
+        assert_eq!(component_count2("usr/files/home")?, 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn more_string() -> Result<(), anyhow::Error> {
+        use std::borrow::Borrow;
+
+        pub fn len_plus_2(s: impl Borrow<str>) -> usize {
+            s.borrow().len() + 2
+        }
+
+        assert_eq!(len_plus_2("Hello"), 7); // move a &str
+                                            // let input: &str = "Hello";
+                                            // assert_eq!(len_plus_2(&input), 7); // borrow a &str
+                                            // let input: String = "Hello".to_string();
+                                            // assert_eq!(len_plus_2(&input), 7); // borrow a String
+                                            // let input2: &String = &input;
+                                            // assert_eq!(len_plus_2(&input2), 7); // borrow a &String
+                                            // assert_eq!(len_plus_2(input2), 7); // move a &String
+                                            // assert_eq!(len_plus_2(input), 7); // move a String
+        Ok(())
+    }
+
+    #[test]
+    fn more_iter() -> Result<(), anyhow::Error> {
+        use crate::anyinput;
+        use std::borrow::Borrow;
+
+        pub fn two_iterator_sum(
+            iter1: impl IntoIterator<Item = usize>,
+            iter2: impl IntoIterator<Item = impl Borrow<str>>,
+        ) -> usize {
+            let mut sum = iter1.into_iter().sum();
+
+            for string in iter2 {
+                sum += string.borrow().len();
+            }
+
+            sum
+        }
+
+        two_iterator_sum(1..=10, ["a", "bb", "ccc"]);
+        let s0 = "bb".to_string();
+        // two_iterator_sum(1..=10, [&s0]);
+
+        #[anyinput]
+        pub fn two_iterator_sum2(iter1: AnyIter<usize>, iter2: AnyIter<AnyString>) -> usize {
+            let mut sum = iter1.sum();
+
+            for string in iter2 {
+                sum += string.as_ref().len();
+            }
+
+            sum
+        }
+        two_iterator_sum2(1..=10, [&s0]);
+
         Ok(())
     }
 

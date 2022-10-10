@@ -6,9 +6,14 @@ anyinput
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-anyinput-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/anyinput)
 [![CI](https://github.com/CarlKCarlK/anyinput/actions/workflows/ci.yml/badge.svg)](https://github.com/CarlKCarlK/anyinput/actions/workflows/ci.yml)
 
+A macro for easier writing of functions that accept any string-, path-, iterator-, array-, or ndarray-like input.
 
+Do you know how to write a function that accepts any kind of string as input? (Are you sure it accepts, for example, a borrowed reference to `String`?) Do you know how to accept any kind of iterator? How about an iterator of any kind of path? How about a function that accepts a `Vec<f32>` as a `ndarray::ArrayView1`? If yes, you don't need this crate.
 
-Easily create functions that accept any type of string-, path-, iterator-, or array-like inputs. The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`.
+Rust functions can accept all these inputs, but the syntax can be hard to remember and read.
+This crate provides syntactic sugar that makes writing and reading such functions easier.
+
+The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally) `AnyNdArray`. They may be nested.
 
 ##### Contents
   - [Usage](#usage)
@@ -26,7 +31,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anyinput = { version = "0.1.3", features = ["ndarray"] }
+anyinput = { version = "0.1.4", features = ["ndarray"] }
 ```
 
 If you don't need `NdArray` support, omit the `ndarray` feature.
