@@ -390,6 +390,51 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn more_iter2() -> Result<(), anyhow::Error> {
+        use crate::anyinput;
+
+        #[anyinput]
+        fn iid0(iid: AnyIter<AnyString>) -> usize {
+            let mut sum = 0;
+            for s in iid {
+                sum += s.as_ref().len();
+            }
+            sum
+        }
+
+        fn iid1<I: IntoIterator<Item = T>, T: AsRef<str>>(iid: I) -> usize {
+            let mut sum = 0;
+            for s in iid {
+                sum += s.as_ref().len();
+            }
+            sum
+        }
+
+        fn iid2<I: IntoIterator>(iid: I) -> usize
+        where
+            <I as IntoIterator>::Item: AsRef<str>,
+        {
+            let mut sum = 0;
+            for s in iid {
+                sum += s.as_ref().len();
+            }
+            sum
+        }
+
+        //let fa = iid0;
+
+        assert_eq!(iid0::<&str, [&str; 3]>(["a", "bb", "ccc"]), 6);
+
+        // assert_eq!(iid0::<_, _>(["a", "bb", "ccc"]), 6);
+        assert_eq!(iid1::<[&str; 3], &str>(["a", "bb", "ccc"]), 6);
+        assert_eq!(iid2::<[&str; 3]>(["a", "bb", "ccc"]), 6);
+        assert_eq!(iid1(["a", "bb", "ccc"]), 6);
+        assert_eq!(iid2(["a", "bb", "ccc"]), 6);
+
+        Ok(())
+    }
+
     // todo make this a real test
     // #[test]
     // fn misapply() -> Result<(), anyhow::Error> {

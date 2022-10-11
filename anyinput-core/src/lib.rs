@@ -1075,6 +1075,28 @@ mod tests {
         let _after = transform_fn(before, &mut generic_gen_simple_factory());
     }
 
+    #[test]
+    fn see_bed_reader() {
+        let before = parse_quote! {
+         pub fn iid(mut self, iid: AnyIter<AnyString>) -> Self {
+             // Unwrap will always work because BedBuilder starting with some metadata
+             self.metadata.as_mut().unwrap().set_iid(iid);
+             self
+         }
+        };
+        let after = transform_fn(before, &mut generic_gen_simple_factory());
+        println!("after: {}", quote! { #after});
+
+        // pub fn iid<AnyString0: AsRef<str>, AnyIter1: IntoIterator<Item = AnyString0>>(
+        //     mut self,
+        //     iid: AnyIter1,
+        // ) -> Self {
+        //     let iid = iid.into_iter();
+        //     self.metadata.as_mut().unwrap().set_iid(iid);
+        //     self
+        // }
+    }
+
     // #[test]
     // #[should_panic(
     //     expected = "AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>."

@@ -1,7 +1,7 @@
 [package]
-version = "0.1.4"
+version = "0.1.5"
 name = "anyinput"
-description = "Easily create functions that accept any type of string, path-, iterator-, or array-like inputs."
+description = "A macro for easier writing of functions that accept any string-, path-, iterator-, array-, or ndarray-like input"
 repository = "https://github.com/CarlKCarlK/anyinput"
 readme = "README.md"
 documentation = "https://docs.rs/fetch-data/latest/anyinput/"
@@ -27,4 +27,4 @@ anyhow = "1.0"
 ndarray = { version = "0.15" }
 
 [dependencies]
-anyinput-derive = { version = "0.1.4", path = "anyinput-derive" }
+anyinput-derive = { version = "0.1.5", path = "anyinput-derive" }
