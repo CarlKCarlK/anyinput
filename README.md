@@ -17,14 +17,12 @@ The AnyInputs are `AnyString`, `AnyPath`, `AnyIter`, `AnyArray`, and (optionally
 Contents
 --------
 
-- [anyinput](#anyinput)
-  - [Contents](#contents)
-  - [Usage](#usage)
-  - [Examples](#examples)
-  - [The AnyInputs](#the-anyinputs)
-  - [Notes & Features](#notes--features)
-  - [How It Works](#how-it-works)
-  - [Project Links](#project-links)
+- [Usage](#usage)
+- [Examples](#examples)
+- [The AnyInputs](#the-anyinputs)
+- [Notes & Features](#notes--features)
+- [How It Works](#how-it-works)
+- [Project Links](#project-links)
 
 Usage
 -----
