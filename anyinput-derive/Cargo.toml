@@ -21,6 +21,5 @@ ndarray = ["anyinput-core/ndarray"]
 
 [dependencies]
 anyinput-core = { version = "0.1.5", path = "../anyinput-core" }
-proc-macro-error = "1.0"
 syn = { version = "1.0.60", features = ["extra-traits", "full", "fold"] }
 quote = "1.0.9"

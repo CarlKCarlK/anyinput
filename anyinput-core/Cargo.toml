@@ -25,13 +25,11 @@ ndarray = ["dep:ndarray"]
 # todo understand what trybuild does
 # trybuild = { version = "1.0", features = ["diff"] }
 colored-diff = "0.2.3"
+anyhow = "1.0"
 
 [dependencies]
-# uuid = { version = "1.1.2", features = ["v4"] } // cmk remove this if not used.
-anyhow = "1.0"                                                            # cmk
 syn = { version = "1.0.60", features = ["extra-traits", "full", "fold"] }
 quote = "1.0.9"
 proc-macro2 = "1.0.24"
 strum = { version = "0.24", features = ["derive"] }
 ndarray = { version = "0.15.4", optional = true }
-proc-macro-error = "1.0"

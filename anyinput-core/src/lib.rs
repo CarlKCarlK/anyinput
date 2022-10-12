@@ -5,7 +5,6 @@ mod tests;
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
 use proc_macro2::Span;
-use proc_macro_error::abort;
 // todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 use quote::quote;
 use std::str::FromStr;
@@ -19,10 +18,6 @@ use syn::{
 };
 pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
-}
-
-pub fn some_other_2() {
-    abort!("test cmk{}", "test");
 }
 
 #[derive(Debug, Clone, EnumString)]
@@ -54,14 +49,14 @@ impl Special {
         match &self {
             Special::AnyString => {
                 if sub_type.is_some() {
-                    abort!("AnyString should not have a generic parameter, so AnyString, not AnyString<{}>.", quote!(#sub_type));
+                    panic!("AnyString should not have a generic parameter, so AnyString, not AnyString<{}>.", quote!(#sub_type));
                 };
                 assert!(lifetime.is_none(), "AnyString should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<str>)
             }
             Special::AnyPath => {
                 if sub_type.is_some() {
-                    abort!(
+                    panic!(
                         "AnyPath should not have a generic parameter, so AnyPath, not AnyPath<{}>.",
                         quote!(#sub_type)
                     );
@@ -70,19 +65,27 @@ impl Special {
                 parse_quote!(#new_type : AsRef<std::path::Path>)
             }
             Special::AnyArray => {
-                let sub_type = sub_type.expect("AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.");
+                let sub_type = match sub_type {
+                    Some(sub_type) => sub_type,
+                    None => panic!("AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString_cmk>.")
+                };
                 assert!(lifetime.is_none(), "AnyArray should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<[#sub_type]>)
             }
             Special::AnyIter => {
-                let sub_type = sub_type.expect(
-                    "AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.",
-                );
+                let sub_type =
+                match sub_type {
+                    Some(sub_type) => sub_type,
+                    None => panic!("AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
+                };
                 assert!(lifetime.is_none(), "AnyIter should not have a lifetime.");
                 parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
             }
             Special::AnyNdArray => {
-                let sub_type = sub_type.expect("AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.");
+                match sub_type {
+                    Some(sub_type) => sub_type,
+                    None => panic!("AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
+                };
                 let lifetime =
                     lifetime.expect("Internal error: AnyNdArray should be given a lifetime.");
                 parse_quote!(#new_type: Into<ndarray::ArrayView1<#lifetime, #sub_type>>)
@@ -366,7 +369,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
         PathArguments::None => None,
         PathArguments::AngleBracketed(ref args) => {
             let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
-                abort!(
+                panic!(
                     "Expected at most one generic parameter, not '{}'",
                     quote!(#args)
                 )
@@ -375,14 +378,14 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
             if let GenericArgument::Type(sub_type2) = arg {
                 Some(sub_type2.clone())
             } else {
-                abort!(
+                panic!(
                     "Expected generic parameter to be a type, not '{}'",
                     quote!(#args)
                 )
             }
         }
         PathArguments::Parenthesized(_) => {
-            abort!("Expected <..> generic parameter,  not '{}'", quote!(#args))
+            panic!("Expected <..> generic parameter,  not '{}'", quote!(#args))
         }
     }
 }
