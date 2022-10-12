@@ -4,7 +4,8 @@ mod tests;
 // todo use AST spans test so that problems with the user's syntax are reported correctly
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
-// todo could nested .as_ref(), .into_iter(), and .into() be replaced with a single method?
+use proc_macro2::Span;
+// todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 use quote::quote;
 use std::str::FromStr;
 use strum::EnumString;
@@ -37,7 +38,7 @@ enum Special {
     AnyNdArray,
 }
 
-// todo do something interesting with 2d ndarray/views
+// todo later do something interesting with 2d ndarray/views
 
 impl Special {
     fn should_add_lifetime(&self) -> bool {
@@ -132,14 +133,14 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
 
     // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
-    // todo Is this the best way to create a new function from an old one?
+    // // todo Is this the best way to create a new function from an old one?
+    let span = Span::call_site();
     ItemFn {
         sig: Signature {
             generics: Generics {
-                // todo: Define all constants outside the loop
-                lt_token: parse_quote!(<),
-                gt_token: parse_quote!(>),
+                lt_token: Some(syn::Token![<]([span])),
                 params: delta_fun_args.generic_params,
+                gt_token: Some(syn::Token![>]([span])),
                 ..old_fn.sig.generics.clone()
             },
             inputs: delta_fun_args.fn_args,
