@@ -10,22 +10,14 @@ use quote::quote;
 use std::str::FromStr;
 use strum::EnumString;
 // todo don't use private
-use syn::__private::TokenStream;
 use syn::fold::{fold_type_path, Fold};
 use syn::{
-    parse_macro_input, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
-    GenericArgument, GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType,
-    PathArguments, PathSegment, Signature, Stmt, Type, TypePath,
+    parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg, GenericArgument,
+    GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType, PathArguments, PathSegment,
+    Signature, Stmt, Type, TypePath,
 };
 pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
-}
-
-pub fn anyinput_core(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let old_item_fn = parse_macro_input!(input as ItemFn);
-    let mut generic_gen = generic_gen_simple_factory();
-    let new_item_fn = transform_fn(old_item_fn, &mut generic_gen);
-    TokenStream::from(quote!(#new_item_fn))
 }
 
 #[derive(Debug, Clone, EnumString)]
@@ -47,6 +39,7 @@ impl Special {
             Special::AnyNdArray => true,
         }
     }
+
     fn special_to_generic_param(
         &self,
         new_type: &TypePath,
