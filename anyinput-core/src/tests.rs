@@ -566,7 +566,7 @@ fn doc_write() -> Result<(), anyhow::Error> {
 
 #[test]
 #[should_panic(expected = "Expected at most one generic parameter, not '< AnyString0 , usize >'")]
-fn one_bad_input() {
+fn one_bad_input_1() {
     let before = parse_quote! {
     pub fn any_str_len(s: AnyIter<AnyString,usize>) -> Result<usize, anyhow::Error> {
         let len = s.len();

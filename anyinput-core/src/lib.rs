@@ -5,6 +5,7 @@ mod tests;
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
 use proc_macro2::Span;
+use proc_macro_error::abort;
 // todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 use quote::quote;
 use std::str::FromStr;
@@ -18,6 +19,10 @@ use syn::{
 };
 pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
+}
+
+pub fn some_other_2() {
+    abort!("test cmk{}", "test");
 }
 
 #[derive(Debug, Clone, EnumString)]
@@ -49,14 +54,14 @@ impl Special {
         match &self {
             Special::AnyString => {
                 if sub_type.is_some() {
-                    panic!("AnyString should not have a generic parameter, so AnyString, not AnyString<{}>.", quote!(#sub_type));
+                    abort!("AnyString should not have a generic parameter, so AnyString, not AnyString<{}>.", quote!(#sub_type));
                 };
                 assert!(lifetime.is_none(), "AnyString should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<str>)
             }
             Special::AnyPath => {
                 if sub_type.is_some() {
-                    panic!(
+                    abort!(
                         "AnyPath should not have a generic parameter, so AnyPath, not AnyPath<{}>.",
                         quote!(#sub_type)
                     );
@@ -361,7 +366,7 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
         PathArguments::None => None,
         PathArguments::AngleBracketed(ref args) => {
             let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
-                panic!(
+                abort!(
                     "Expected at most one generic parameter, not '{}'",
                     quote!(#args)
                 )
@@ -370,14 +375,14 @@ fn has_sub_type(args: PathArguments) -> Option<Type> {
             if let GenericArgument::Type(sub_type2) = arg {
                 Some(sub_type2.clone())
             } else {
-                panic!(
+                abort!(
                     "Expected generic parameter to be a type, not '{}'",
                     quote!(#args)
                 )
             }
         }
         PathArguments::Parenthesized(_) => {
-            panic!("Expected <..> generic parameter,  not '{}'", quote!(#args))
+            abort!("Expected <..> generic parameter,  not '{}'", quote!(#args))
         }
     }
 }
