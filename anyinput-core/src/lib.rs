@@ -9,7 +9,6 @@ use proc_macro2::Span;
 use quote::quote;
 use std::str::FromStr;
 use strum::EnumString;
-// todo don't use private
 use syn::fold::{fold_type_path, Fold};
 use syn::{
     parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg, GenericArgument,
@@ -67,7 +66,7 @@ impl Special {
             Special::AnyArray => {
                 let sub_type = match sub_type {
                     Some(sub_type) => sub_type,
-                    None => panic!("AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString_cmk>.")
+                    None => panic!("AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
                 };
                 assert!(lifetime.is_none(), "AnyArray should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<[#sub_type]>)
@@ -155,36 +154,6 @@ pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = Strin
     }
 }
 
-// pub struct UuidGenerator {
-//     counter: usize,
-//     uuid: String,
-// }
-
-// impl Default for UuidGenerator {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
-
-// impl UuidGenerator {
-//     pub fn new() -> Self {
-//         Self {
-//             uuid: Uuid::new_v4().to_string().replace('-', ""),
-//             counter: 0,
-//         }
-//     }
-// }
-
-// impl Iterator for UuidGenerator {
-//     type Item = String;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let s = format!("{}_{}", self.uuid, self.counter);
-//         self.counter += 1;
-//         Some(s)
-//     }
-// }
-
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     let first = iter.next()?;
     if iter.next().is_some() {
@@ -193,18 +162,6 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
         Some(first)
     }
 }
-
-// Look for special inputs such as 's: AnyString'. If found, replace with generics special 's: S0'.
-// Todo support: AnyPath, AnyIter<T>, AnyArray<T> (including AnyArray<AnyPath>), NdArraySpecial<T>, etc.
-
-// for each input, if it is top-level special, replace it with generic(s) and remember the generic(s) and the top-level variable.
-// v: i32 -> v: i32, <>, {}
-// v: AnyString -> v: S0, <S0: AsRef<str>>, {let v = v.as_ref();}
-// v: AnyIter<i32> -> v: S0, <S0: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: AnyIter<AnyString> -> v: S0, <S0: IntoIterator<Item = S1>, S1: AsRef<str>>, {let v = v.into_iter();}
-// v: AnyIter<AnyIter<i32>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = i32>>, {let v = v.into_iter();}
-// v: AnyIter<AnyIter<AnyString>> -> v: S0, <S0: IntoIterator<Item = S1>, S1: IntoIterator<Item = S2>, S2: AsRef<str>>, {let v = v.into_iter();}
-// v: [AnyString] -> v: [S0], <S0: AsRef<str>>, {}
 
 struct DeltaFnArgs {
     fn_args: Punctuated<FnArg, Comma>,

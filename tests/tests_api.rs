@@ -398,17 +398,11 @@ fn more_iter2() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-// #[test]
-// fn test_panic() -> Result<(), anyhow::Error> {
-//     use crate::anyinput;
-
-//     #[anyinput]
-//     fn empty_array(array: AnyArray) {
-//         println!(array[0]);
-//     }
-
-//     Ok(())
-// }
+#[test]
+fn ui() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/ui/*.rs");
+}
 
 // todo make this a real test
 // #[test]
