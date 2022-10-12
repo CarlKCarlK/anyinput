@@ -190,7 +190,7 @@ The AnyInputs
 Notes & Features
 --------
 
-- Feature requests and contributions are welcome.
+- Suggestions, feature requests, and contributions are welcome.
 - Works with nesting, multiple inputs, and generics.
 - Automatically and efficiently converts an top-level AnyInput into a concrete type.
 - Elements of AnyArray, AnyIter, and AnyNdArray must be a single type. So, `AnyArray<AnyString>`
