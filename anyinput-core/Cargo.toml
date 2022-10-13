@@ -22,8 +22,6 @@ ndarray = ["dep:ndarray"]
 
 
 [dev-dependencies]
-# todo understand what trybuild does
-# trybuild = { version = "1.0", features = ["diff"] }
 colored-diff = "0.2.3"
 anyhow = "1.0"
 
@@ -33,3 +31,4 @@ quote = "1.0.9"
 proc-macro2 = "1.0.24"
 strum = { version = "0.24", features = ["derive"] }
 ndarray = { version = "0.15.4", optional = true }
+proc-macro-error = "1.0"

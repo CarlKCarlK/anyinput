@@ -1,18 +1,18 @@
 #![doc = include_str!("../README.md")]
-#![feature(proc_macro_diagnostic)]
-#![feature(proc_macro_span)]
+// cmk #![feature(proc_macro_diagnostic)]
+// cmk #![feature(proc_macro_span)]
 
 mod tests;
 // todo use AST spans test so that problems with the user's syntax are reported correctly
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
 use proc_macro2::Span;
+use proc_macro_error::abort;
 // todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 use quote::quote;
 use std::str::FromStr;
 use strum::EnumString;
 use syn::fold::{fold_type_path, Fold};
-use syn::spanned::Spanned;
 use syn::{
     parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg, GenericArgument,
     GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType, PathArguments, PathSegment,
@@ -52,22 +52,24 @@ impl Special {
         match &self {
             Special::AnyString => {
                 if sub_type.is_some() {
-                    old_type
-                        .span()
-                        .unwrap()
-                        .error("AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
-                        .emit();
+                    abort!(old_type,"AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
+                    // old_type
+                    //     .span()
+                    //     .unwrap()
+                    //     .error("AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
+                    //     .emit();
                 };
                 assert!(lifetime.is_none(), "AnyString should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<str>)
             }
             Special::AnyPath => {
                 if sub_type.is_some() {
-                    old_type
-                        .span()
-                        .unwrap()
-                        .error("AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
-                        .emit();
+                    abort!(old_type,"AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
+                    // old_type
+                    //     .span()
+                    //     .unwrap()
+                    //     .error("AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
+                    //     .emit();
                 };
                 assert!(lifetime.is_none(), "AnyPath should not have a lifetime.");
                 parse_quote!(#new_type : AsRef<std::path::Path>)
@@ -76,11 +78,12 @@ impl Special {
                 let sub_type = match sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        old_type.span()
-                            .unwrap()
-                            .error("AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
-                            .emit();
-                        panic!("Bad AnyArray format.");
+                        abort!(old_type,"AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
+                        // old_type.span()
+                        //     .unwrap()
+                        //     .error("AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
+                        //     .emit();
+                        // panic!("Bad AnyArray format.");
                     }
                 };
                 assert!(lifetime.is_none(), "AnyArray should not have a lifetime.");
@@ -90,11 +93,12 @@ impl Special {
                 let sub_type = match sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        old_type.span()
-                            .unwrap()
-                            .error("AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
-                            .emit();
-                        panic!("Bad AnyIter format.");
+                        abort!(old_type,"AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
+                        // old_type.span()
+                        //     .unwrap()
+                        //     .error("AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
+                        //     .emit();
+                        // panic!("Bad AnyIter format.");
                     }
                 };
                 assert!(lifetime.is_none(), "AnyIter should not have a lifetime.");
@@ -104,11 +108,12 @@ impl Special {
                 match sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        old_type.span()
-                            .unwrap()
-                            .error("AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
-                            .emit();
-                        panic!("Bad AnyNdArray format.");
+                        abort!(old_type,"AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
+                        // old_type.span()
+                        //     .unwrap()
+                        //     .error("AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
+                        //     .emit();
+                        // panic!("Bad AnyNdArray format.");
                     }
                 };
                 let lifetime =
