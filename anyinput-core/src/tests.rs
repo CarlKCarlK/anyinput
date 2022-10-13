@@ -1,18 +1,15 @@
 #![cfg(test)]
 
 use crate::{generic_gen_simple_factory, transform_fn, DeltaPatType};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{fold::Fold, parse_quote, ItemFn};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
 
-fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
-    if after == expected {
-        return;
-    }
+fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(after: T0, expected: T1) {
+    let after_str = after.to_token_stream().to_string();
+    let expected_str = expected.to_token_stream().to_string();
 
-    let after_str = format!("{}", quote!(#after));
-    let expected_str = format!("{}", quote!(#expected));
     if after_str == expected_str {
         return;
     }
@@ -23,8 +20,8 @@ fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
             actual: &after_str,
         }
     );
-    println!("expected: {}", expected_str);
-    println!("after   : {}", after_str);
+    println!("expected: {}", &expected_str);
+    println!("after   : {}", &after_str);
     panic!("after != expected");
 }
 
@@ -36,7 +33,7 @@ fn one_input() {
         Ok(len)
     }
        };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             let len = s.len();
@@ -45,7 +42,7 @@ fn one_input() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(after, expected);
 
     pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
         let s = s.as_ref();
@@ -63,7 +60,7 @@ fn two_inputs() {
             Ok(len)
         }
     };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
             a: AnyString0,
             b: AnyString1
@@ -76,7 +73,7 @@ fn two_inputs() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
         a: AnyString0,
@@ -99,14 +96,14 @@ fn zero_inputs() {
         let len = 0;
         Ok(len)
     }};
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
     pub fn any_str_len0<>() -> Result<usize, anyhow::Error> {
         let len = 0;
         Ok(len)
     }};
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 }
 
 #[test]
@@ -117,7 +114,7 @@ fn one_plus_two_input() {
             Ok(len)
         }
     };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
             a: usize,
             s: AnyString0,
@@ -130,7 +127,7 @@ fn one_plus_two_input() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
         a: usize,
@@ -161,7 +158,7 @@ fn one_path_input() {
         Ok(count)
     }
       };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
             p: AnyPath0
         ) -> Result<usize, anyhow::Error> {
@@ -172,7 +169,7 @@ fn one_path_input() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
         p: AnyPath0,
@@ -192,7 +189,7 @@ fn one_iter_usize_input() {
             Ok(count)
         }
     };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
@@ -203,7 +200,7 @@ fn one_iter_usize_input() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
         i: AnyIter0,
@@ -223,7 +220,7 @@ fn one_iter_i32() {
         Ok(count)
     }
         };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
@@ -234,7 +231,7 @@ fn one_iter_i32() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
         i: AnyIter0,
@@ -254,7 +251,7 @@ fn one_iter_t() {
         Ok(count)
     }
        };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
@@ -265,7 +262,7 @@ fn one_iter_t() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
         i: AnyIter0,
@@ -285,7 +282,7 @@ fn one_iter_path() {
         Ok(sum_count)
     }
        };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
             pub fn any_count_iter<
             AnyPath0: AsRef<std::path::Path>,
             AnyIter1: IntoIterator<Item = AnyPath0>
@@ -299,7 +296,7 @@ fn one_iter_path() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<
         AnyPath0: AsRef<std::path::Path>,
@@ -324,7 +321,7 @@ fn one_vec_path() {
             Ok(sum_count)
         }
     };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
     pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
         i: Vec<AnyPath0>
     ) -> Result<usize, anyhow::Error> {
@@ -333,7 +330,7 @@ fn one_vec_path() {
     }};
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
         i: Vec<AnyPath0>,
@@ -370,7 +367,7 @@ fn one_array_usize_input() {
         Ok(len)
     }
       };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn any_array_len<AnyArray0: AsRef<[usize]>>(
             a: AnyArray0
         ) -> Result<usize, anyhow::Error> {
@@ -381,7 +378,7 @@ fn one_array_usize_input() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn any_array_len<AnyArray0: AsRef<[usize]>>(a: AnyArray0) -> Result<usize, anyhow::Error> {
         let a = a.as_ref();
@@ -412,7 +409,7 @@ fn one_ndarray_usize_input() {
         let len = a.len();
         Ok(len)
     }        };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
             pub fn any_array_len<
             'any_nd_array1,
             AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>
@@ -426,7 +423,7 @@ fn one_ndarray_usize_input() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     // The lines are long enough that Clippy would like a comma after
     // a:AnyNdArray0, but the macro doesn't do that because
@@ -466,7 +463,7 @@ fn complex() {
             Ok(total)
             }
     };
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         pub fn complex_total<
         'any_nd_array4,
         AnyPath0: AsRef<std::path::Path>,
@@ -495,7 +492,7 @@ fn complex() {
     };
 
     let after = transform_fn(before, &mut generic_gen_simple_factory());
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     pub fn complex_total<
         'any_nd_array4,
@@ -537,13 +534,13 @@ fn doc_write() -> Result<(), anyhow::Error> {
     }        };
     let after = transform_fn(before, &mut generic_gen_simple_factory());
     println!("after: {}", quote! { #after});
-    let expected = parse_quote! {
+    let expected: ItemFn = parse_quote! {
         fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             Ok(s.len() + 2)
         }
     };
-    assert_item_fn_eq(&after, &expected);
+    assert_tokens_eq(&after, &expected);
 
     fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
         let s = s.as_ref();
@@ -709,4 +706,11 @@ fn understand_parse_quote() {
     // println!("{}", &item_fn);
     println!("{:?}", &item_fn);
     println!("{:#?}", &item_fn);
+
+    use quote::ToTokens;
+    let token_stream: proc_macro2::TokenStream = item_fn.clone().into_token_stream();
+    let _token_stream2: proc_macro2::TokenStream = quote!(#item_fn);
+    println!("{}", &token_stream);
+    println!("{:?}", &token_stream);
+    println!("{:#?}", &token_stream);
 }
