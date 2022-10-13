@@ -1,0 +1,5 @@
+error: Expected generic parameter to be a type.
+ --> tests/ui/anyiterconst.rs:4:23
+  |
+4 | pub fn any_str_len(s: AnyIter<3>) -> Result<usize, anyhow::Error> {
+  |                       ^^^^^^^^^^

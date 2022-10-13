@@ -1,0 +1,5 @@
+error: AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.
+ --> tests/ui/anypath.rs:4:23
+  |
+4 | pub fn any_str_len(s: AnyPath<usize>) -> Result<usize, anyhow::Error> {
+  |                       ^^^^^^^^^^^^^^

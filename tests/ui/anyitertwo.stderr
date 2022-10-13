@@ -1,0 +1,5 @@
+error: Expected at exactly one generic parameter.
+ --> tests/ui/anyitertwo.rs:4:23
+  |
+4 | pub fn any_str_len(s: AnyIter<AnyString, usize>) -> Result<usize, anyhow::Error> {
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^
