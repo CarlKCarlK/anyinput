@@ -1,0 +1,5 @@
+error: expected `fn`
+ --> tests/ui/misapply.rs:4:1
+  |
+4 | struct Test {
+  | ^^^^^^

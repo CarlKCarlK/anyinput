@@ -404,18 +404,5 @@ fn ui() {
     t.compile_fail("tests/ui/*.rs");
 }
 
-// todo make this a real test
-// #[test]
-// fn misapply() -> Result<(), anyhow::Error> {
-//     use crate::anyinput;
-
-//     #[anyinput]
-//     struct Test {
-//         a: AnyString,
-//         b: AnyString,
-//     }
-//     Ok(())
-// }
-
 // todo later should their be a warning/error if there is no Anyinput on a function to which this has been applied?
 // todo must test badly-formed functions to see that the error messages make sense.
