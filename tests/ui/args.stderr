@@ -1,0 +1,5 @@
+error: anyinput does not take any arguments.
+ --> tests/ui/args.rs:3:12
+  |
+3 | #[anyinput(not_empty)]
+  |            ^^^^^^^^^

@@ -28,15 +28,6 @@ fn assert_item_fn_eq(after: &ItemFn, expected: &ItemFn) {
     panic!("after != expected");
 }
 
-// #[test]
-// fn uuid() {
-//     let mut uuid_generator = UuidGenerator::new();
-//     for i in 0..10 {
-//         let _ = uuid_generator.next();
-//         println!("{:#?}", i);
-//     }
-// }
-
 #[test]
 fn one_input() {
     let before = parse_quote! {
@@ -697,16 +688,25 @@ fn see_bed_reader() {
     // }
 }
 
-// #[test]
-// #[should_panic(
-//     expected = "AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>."
-// )]
-// fn one_bad_input_9() {
-//     let before = parse_quote! {
-//     pub fn any_str_len<'a>(s: AnyNdArray<'a,usize>) -> Result<usize, anyhow::Error> {
-//         let len = s.len();
-//         Ok(len)
-//     }
-//        };
-//     let _after = transform_fn(before, &mut generic_gen_simple_factory());
-// }
+#[test]
+fn understand_token_stream() {
+    let token_stream = quote!(
+        pub fn hello() {
+            println!("hello world")
+        }
+    );
+    println!("{:#?}", token_stream);
+}
+
+#[test]
+fn understand_parse_quote() {
+    let item_fn: ItemFn = parse_quote!(
+        pub fn hello() {
+            println!("hello world")
+        }
+    );
+
+    // println!("{}", &item_fn);
+    println!("{:?}", &item_fn);
+    println!("{:#?}", &item_fn);
+}

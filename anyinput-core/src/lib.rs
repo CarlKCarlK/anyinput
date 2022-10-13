@@ -120,11 +120,17 @@ impl Special {
     }
 }
 
-pub fn anyinput_core(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
+    if !args.is_empty() {
+        abort!(
+            proc_macro2::TokenStream::from(args),
+            "anyinput does not take any arguments."
+        )
+    }
     let old_item_fn = parse_macro_input!(input as ItemFn);
     let mut generic_gen = generic_gen_simple_factory();
     let new_item_fn = transform_fn(old_item_fn, &mut generic_gen);
-    TokenStream::from(quote!(#new_item_fn))
+    quote!(#new_item_fn).into()
 }
 // cmk raise error if _args is not empty
 
