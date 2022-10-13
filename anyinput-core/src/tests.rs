@@ -642,9 +642,7 @@ fn one_bad_input_6() {
 }
 
 #[test]
-#[should_panic(
-    expected = "AnyString should not have a generic parameter, so AnyString, not AnyString<usize>."
-)]
+#[should_panic(expected = "proc_macro::Span is only available in procedural macros")]
 fn one_bad_input_7() {
     let before = parse_quote! {
     pub fn any_str_len(s: AnyString<usize>) -> Result<usize, anyhow::Error> {

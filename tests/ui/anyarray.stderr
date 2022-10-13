@@ -1,7 +1,13 @@
+error: AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.
+ --> tests/ui/anyarray.rs:4:23
+  |
+4 | fn empty_array(array: AnyArray) {
+  |                       ^^^^^^^^
+
 error: custom attribute panicked
  --> tests/ui/anyarray.rs:3:1
   |
 3 | #[anyinput]
   | ^^^^^^^^^^^
   |
-  = help: message: AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.
+  = help: message: Bad AnyArray format.

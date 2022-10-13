@@ -1,0 +1,5 @@
+error: AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.
+ --> tests/ui/anystring.rs:4:19
+  |
+4 | fn full_string(s: AnyString<AnyPath>) {
+  |                   ^^^^^^^^^^^^^^^^^^
