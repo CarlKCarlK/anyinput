@@ -565,7 +565,9 @@ fn doc_write() -> Result<(), anyhow::Error> {
 }
 
 #[test]
-#[should_panic(expected = "Expected at most one generic parameter, not '< AnyString0 , usize >'")]
+#[should_panic(
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
+)]
 fn one_bad_input_1() {
     let before = parse_quote! {
     pub fn any_str_len(s: AnyIter<AnyString,usize>) -> Result<usize, anyhow::Error> {
@@ -577,7 +579,9 @@ fn one_bad_input_1() {
 }
 
 #[test]
-#[should_panic(expected = "Expected generic parameter to be a type, not '< 3 >'")]
+#[should_panic(
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
+)]
 fn one_bad_input_2() {
     let before = parse_quote! {
     pub fn any_str_len(s: AnyIter<3>) -> Result<usize, anyhow::Error> {
@@ -589,7 +593,9 @@ fn one_bad_input_2() {
 }
 
 #[test]
-#[should_panic(expected = "Expected <..> generic parameter,  not '(AnyString0)'")]
+#[should_panic(
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
+)]
 fn one_bad_input_3() {
     let before = parse_quote! {
     pub fn any_str_len(s: AnyIter(AnyString)) -> Result<usize, anyhow::Error> {
@@ -602,7 +608,7 @@ fn one_bad_input_3() {
 
 #[test]
 #[should_panic(
-    expected = "AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>."
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_4() {
     let before = parse_quote! {
@@ -616,7 +622,7 @@ fn one_bad_input_4() {
 
 #[test]
 #[should_panic(
-    expected = "AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>."
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_5() {
     let before = parse_quote! {
@@ -629,7 +635,7 @@ fn one_bad_input_5() {
 }
 #[test]
 #[should_panic(
-    expected = "AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>."
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_6() {
     let before = parse_quote! {
@@ -642,7 +648,9 @@ fn one_bad_input_6() {
 }
 
 #[test]
-#[should_panic(expected = "proc_macro::Span is only available in procedural macros")]
+#[should_panic(
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
+)]
 fn one_bad_input_7() {
     let before = parse_quote! {
     pub fn any_str_len(s: AnyString<usize>) -> Result<usize, anyhow::Error> {
@@ -655,7 +663,7 @@ fn one_bad_input_7() {
 
 #[test]
 #[should_panic(
-    expected = "AnyPath should not have a generic parameter, so AnyPath, not AnyPath<usize>."
+    expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_8() {
     let before = parse_quote! {

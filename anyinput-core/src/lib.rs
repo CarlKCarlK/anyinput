@@ -9,7 +9,6 @@ mod tests;
 use proc_macro2::Span;
 use proc_macro_error::abort;
 // todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
-use quote::quote;
 use std::str::FromStr;
 use strum::EnumString;
 use syn::fold::{fold_type_path, Fold};
@@ -322,7 +321,7 @@ impl Fold for DeltaPatType<'_> {
                 parse_str(&generic_name).expect("Internal error: failed to parse generic name");
 
             // Define the generic type, e.g. S23: AsRef<str>, and remember it.
-            let sub_type = has_sub_type(segment.arguments); // Find anything inside angle brackets.
+            let sub_type = has_sub_type(&type_path_original, segment.arguments); // Find anything inside angle brackets.
 
             let maybe_lifetime = if special.should_add_lifetime() {
                 let suffix = &self
@@ -356,28 +355,21 @@ impl Fold for DeltaPatType<'_> {
     }
 }
 
-fn has_sub_type(args: PathArguments) -> Option<Type> {
+fn has_sub_type(old_type: &TypePath, args: PathArguments) -> Option<Type> {
     match args {
         PathArguments::None => None,
         PathArguments::AngleBracketed(ref args) => {
-            let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
-                panic!(
-                    "Expected at most one generic parameter, not '{}'",
-                    quote!(#args)
-                )
-            });
+            let arg = first_and_only(args.args.iter())
+                .unwrap_or_else(|| abort!(old_type, "Expected at exactly one generic parameter."));
             // println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
                 Some(sub_type2.clone())
             } else {
-                panic!(
-                    "Expected generic parameter to be a type, not '{}'",
-                    quote!(#args)
-                )
+                abort!(old_type, "Expected generic parameter to be a type.")
             }
         }
         PathArguments::Parenthesized(_) => {
-            panic!("Expected <..> generic parameter,  not '{}'", quote!(#args))
+            abort!(old_type, "Expected <..> generic parameter.")
         }
     }
 }
