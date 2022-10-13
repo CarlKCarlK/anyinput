@@ -6,6 +6,8 @@ mod tests;
 
 use proc_macro2::Span;
 use proc_macro_error::abort;
+use syn::__private::TokenStream;
+use syn::parse_macro_input;
 // todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 use std::str::FromStr;
 use strum::EnumString;
@@ -15,9 +17,10 @@ use syn::{
     GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType, PathArguments, PathSegment,
     Signature, Stmt, Type, TypePath,
 };
-pub fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
+fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
 }
+use quote::quote;
 
 #[derive(Debug, Clone, EnumString)]
 #[allow(clippy::enum_variant_names)]
@@ -117,7 +120,15 @@ impl Special {
     }
 }
 
-pub fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = String>) -> ItemFn {
+pub fn anyinput_core(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let old_item_fn = parse_macro_input!(input as ItemFn);
+    let mut generic_gen = generic_gen_simple_factory();
+    let new_item_fn = transform_fn(old_item_fn, &mut generic_gen);
+    TokenStream::from(quote!(#new_item_fn))
+}
+// cmk raise error if _args is not empty
+
+fn transform_fn(old_fn: ItemFn, generic_gen: &mut impl Iterator<Item = String>) -> ItemFn {
     // Start the functions current generic definitions and statements
     let init = DeltaFnArgs {
         fn_args: Punctuated::<FnArg, Comma>::new(),
