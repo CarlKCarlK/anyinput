@@ -7,7 +7,7 @@ mod tests;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro_error::abort;
-use quote::ToTokens;
+use quote::quote;
 // todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 use std::str::FromStr;
 use strum::EnumString;
@@ -17,6 +17,64 @@ use syn::{
     GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType, PathArguments, PathSegment,
     Signature, Stmt, Type, TypePath,
 };
+
+pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
+    if !args.is_empty() {
+        abort!(args, "anyinput does not take any arguments.")
+    }
+
+    // proc_marco2 version of "parse_macro_input!(input as ItemFn)"
+    let old_item_fn = match syn::parse2::<ItemFn>(input) {
+        Ok(syntax_tree) => syntax_tree,
+        Err(err) => return err.to_compile_error(),
+    };
+
+    let new_item_fn = transform_fn(old_item_fn);
+
+    quote!(#new_item_fn)
+}
+
+fn transform_fn(old_fn: ItemFn) -> ItemFn {
+    let mut generic_gen = generic_gen_simple_factory();
+    // Start the functions current generic definitions and statements
+    let init = DeltaFnArgs {
+        fn_args: Punctuated::<FnArg, Comma>::new(),
+        generic_params: old_fn.sig.generics.params.clone(),
+        stmts: old_fn.block.stmts,
+    };
+
+    // Transform each old argument of the function, accumulating the new arguments, new generic definitions and new statements
+    let delta_fun_args = (old_fn.sig.inputs)
+        .iter()
+        .map(|old_fn_arg| transform_fn_arg(old_fn_arg, &mut generic_gen))
+        .fold(init, |mut delta_fun_args, delta_fun_arg| {
+            delta_fun_args.merge(delta_fun_arg);
+            delta_fun_args
+        });
+
+    // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
+    // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
+    // // todo Is this the best way to create a new function from an old one?
+    let span = Span::call_site();
+    ItemFn {
+        sig: Signature {
+            generics: Generics {
+                lt_token: Some(syn::Token![<]([span])),
+                params: delta_fun_args.generic_params,
+                gt_token: Some(syn::Token![>]([span])),
+                ..old_fn.sig.generics.clone()
+            },
+            inputs: delta_fun_args.fn_args,
+            ..old_fn.sig.clone()
+        },
+        block: Box::new(Block {
+            stmts: delta_fun_args.stmts,
+            ..*old_fn.block
+        }),
+        ..old_fn
+    }
+}
+
 fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
 }
@@ -115,63 +173,6 @@ impl Special {
                 }
             }
         }
-    }
-}
-
-pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
-    if !args.is_empty() {
-        abort!(args, "anyinput does not take any arguments.")
-    }
-
-    let old_item_fn = syn::parse2::<ItemFn>(input);
-
-    let old_item_fn = match old_item_fn {
-        Ok(syntax_tree) => syntax_tree,
-        Err(err) => return err.to_compile_error(),
-    };
-    let new_item_fn = transform_fn(old_item_fn);
-
-    new_item_fn.to_token_stream()
-}
-
-fn transform_fn(old_fn: ItemFn) -> ItemFn {
-    let mut generic_gen = generic_gen_simple_factory();
-    // Start the functions current generic definitions and statements
-    let init = DeltaFnArgs {
-        fn_args: Punctuated::<FnArg, Comma>::new(),
-        generic_params: old_fn.sig.generics.params.clone(),
-        stmts: old_fn.block.stmts,
-    };
-
-    // Transform each old argument of the function, accumulating the new arguments, new generic definitions and new statements
-    let delta_fun_args = (old_fn.sig.inputs)
-        .iter()
-        .map(|old_fn_arg| transform_fn_arg(old_fn_arg, &mut generic_gen))
-        .fold(init, |mut delta_fun_args, delta_fun_arg| {
-            delta_fun_args.merge(delta_fun_arg);
-            delta_fun_args
-        });
-
-    // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
-    // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
-    // // todo Is this the best way to create a new function from an old one?
-    let span = Span::call_site();
-    ItemFn {
-        sig: Signature {
-            generics: Generics {
-                lt_token: Some(syn::Token![<]([span])),
-                params: delta_fun_args.generic_params,
-                gt_token: Some(syn::Token![>]([span])),
-                ..old_fn.sig.generics.clone()
-            },
-            inputs: delta_fun_args.fn_args,
-            ..old_fn.sig.clone()
-        },
-        block: Box::new(Block {
-            stmts: delta_fun_args.stmts,
-            ..*old_fn.block
-        }),
-        ..old_fn
     }
 }
 

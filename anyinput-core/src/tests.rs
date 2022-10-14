@@ -1,37 +1,31 @@
 #![cfg(test)]
 
 use crate::{anyinput_core, generic_gen_simple_factory, DeltaPatType};
-use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{fold::Fold, parse_quote, ItemFn};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
 
-fn anyinput(args: TokenStream, input: TokenStream) -> TokenStream {
-    anyinput_core(args, input)
-}
+fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(expected: T0, actual: T1) {
+    let expected = expected.to_token_stream().to_string();
+    let actual = actual.to_token_stream().to_string();
 
-fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(after: T0, expected: T1) {
-    let after_str = after.to_token_stream().to_string();
-    let expected_str = expected.to_token_stream().to_string();
-
-    if after_str == expected_str {
-        return;
+    if expected != actual {
+        println!(
+            "{}",
+            colored_diff::PrettyDifference {
+                expected: &expected,
+                actual: &actual,
+            }
+        );
+        println!("expected: {}", &expected);
+        println!("actual  : {}", &actual);
+        panic!("expected != actual");
     }
-    println!(
-        "{}",
-        colored_diff::PrettyDifference {
-            expected: &expected_str,
-            actual: &after_str,
-        }
-    );
-    println!("expected: {}", &expected_str);
-    println!("after   : {}", &after_str);
-    panic!("after != expected");
 }
 
 #[test]
-fn one_input() {
+fn one_input() -> anyhow::Result<()> {
     let before = quote! {
     pub fn any_str_len(s: AnyString) -> Result<usize, anyhow::Error> {
         let len = s.len();
@@ -46,26 +40,28 @@ fn one_input() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(after, expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
         let s = s.as_ref();
         let len = s.len();
         Ok(len)
     }
-    assert!(any_str_len("abc").is_ok());
+    assert_eq!(any_str_len("abc")?, 3);
+
+    Ok(())
 }
 
 #[test]
-fn two_inputs() {
-    let before = parse_quote! {
+fn two_inputs() -> anyhow::Result<()> {
+    let before = quote! {
         pub fn any_str_len(a: AnyString, b: AnyString) -> Result<usize, anyhow::Error> {
             let len = a.len() + b.len();
             Ok(len)
         }
     };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
             a: AnyString0,
             b: AnyString1
@@ -77,8 +73,8 @@ fn two_inputs() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
         a: AnyString0,
@@ -91,35 +87,36 @@ fn two_inputs() {
     }
 
     let s = "1234".to_string();
-    assert_eq!(any_str_len("abc", s).unwrap(), 7);
+    assert_eq!(any_str_len("abc", s)?, 7);
+    Ok(())
 }
 
 #[test]
 fn zero_inputs() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len0() -> Result<usize, anyhow::Error> {
         let len = 0;
         Ok(len)
     }};
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
     pub fn any_str_len0<>() -> Result<usize, anyhow::Error> {
         let len = 0;
         Ok(len)
     }};
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 }
 
 #[test]
-fn one_plus_two_input() {
-    let before = parse_quote! {
+fn one_plus_two_input() -> anyhow::Result<()> {
+    let before = quote! {
         pub fn any_str_len_plus2(a: usize, s: AnyString, b: usize) -> Result<usize, anyhow::Error> {
             let len = s.len()+a+b;
             Ok(len)
         }
     };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
             a: usize,
             s: AnyString0,
@@ -131,8 +128,8 @@ fn one_plus_two_input() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
         a: usize,
@@ -143,7 +140,8 @@ fn one_plus_two_input() {
         let len = s.len() + a + b;
         Ok(len)
     }
-    assert_eq!(any_str_len_plus2(1, "abc", 2).unwrap(), 6);
+    assert_eq!(any_str_len_plus2(1, "abc", 2)?, 6);
+    Ok(())
 }
 
 #[test]
@@ -164,8 +162,8 @@ fn one_path_input() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
         p: AnyPath0,
@@ -179,13 +177,13 @@ fn one_path_input() {
 
 #[test]
 fn one_iter_usize_input() {
-    let before = parse_quote! {
+    let before = quote! {
         pub fn any_count_iter(i: AnyIter<usize>) -> Result<usize, anyhow::Error> {
             let count = i.count();
             Ok(count)
         }
     };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
@@ -195,8 +193,8 @@ fn one_iter_usize_input() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
         i: AnyIter0,
@@ -210,13 +208,13 @@ fn one_iter_usize_input() {
 
 #[test]
 fn one_iter_i32() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_count_iter(i: AnyIter<i32>) -> Result<usize, anyhow::Error> {
         let count = i.count();
         Ok(count)
     }
         };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
@@ -226,8 +224,8 @@ fn one_iter_i32() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
         i: AnyIter0,
@@ -241,13 +239,13 @@ fn one_iter_i32() {
 
 #[test]
 fn one_iter_t() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_count_iter<T>(i: AnyIter<T>) -> Result<usize, anyhow::Error> {
         let count = i.count();
         Ok(count)
     }
        };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
@@ -257,8 +255,8 @@ fn one_iter_t() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
         i: AnyIter0,
@@ -272,13 +270,13 @@ fn one_iter_t() {
 
 #[test]
 fn one_iter_path() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_count_iter(i: AnyIter<AnyPath>) -> Result<usize, anyhow::Error> {
         let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
         Ok(sum_count)
     }
        };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
             pub fn any_count_iter<
             AnyPath0: AsRef<std::path::Path>,
             AnyIter1: IntoIterator<Item = AnyPath0>
@@ -291,8 +289,8 @@ fn one_iter_path() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_count_iter<
         AnyPath0: AsRef<std::path::Path>,
@@ -309,7 +307,7 @@ fn one_iter_path() {
 
 #[test]
 fn one_vec_path() {
-    let before = parse_quote! {
+    let before = quote! {
         pub fn any_count_vec(
             i: Vec<AnyPath>,
         ) -> Result<usize, anyhow::Error> {
@@ -317,7 +315,7 @@ fn one_vec_path() {
             Ok(sum_count)
         }
     };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
     pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
         i: Vec<AnyPath0>
     ) -> Result<usize, anyhow::Error> {
@@ -325,8 +323,8 @@ fn one_vec_path() {
         Ok(sum_count)
     }};
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
         i: Vec<AnyPath0>,
@@ -357,13 +355,13 @@ fn fold_one_path() {
 
 #[test]
 fn one_array_usize_input() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_array_len(a: AnyArray<usize>) -> Result<usize, anyhow::Error> {
         let len = a.len();
         Ok(len)
     }
       };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_array_len<AnyArray0: AsRef<[usize]>>(
             a: AnyArray0
         ) -> Result<usize, anyhow::Error> {
@@ -373,8 +371,8 @@ fn one_array_usize_input() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn any_array_len<AnyArray0: AsRef<[usize]>>(a: AnyArray0) -> Result<usize, anyhow::Error> {
         let a = a.as_ref();
@@ -400,12 +398,12 @@ fn understand_lifetime_parse() {
 #[cfg(feature = "ndarray")]
 #[test]
 fn one_ndarray_usize_input() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_array_len(a: AnyNdArray<usize>) -> Result<usize, anyhow::Error> {
         let len = a.len();
         Ok(len)
     }        };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
             pub fn any_array_len<
             'any_nd_array1,
             AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>
@@ -418,8 +416,8 @@ fn one_ndarray_usize_input() {
         }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     // The lines are long enough that Clippy would like a comma after
     // a:AnyNdArray0, but the macro doesn't do that because
@@ -440,7 +438,7 @@ fn one_ndarray_usize_input() {
 #[test]
 #[cfg(feature = "ndarray")]
 fn complex() {
-    let before = parse_quote! {
+    let before = quote! {
         pub fn complex_total(
             a: usize,
             b: AnyIter<Vec<AnyArray<AnyPath>>>,
@@ -459,7 +457,7 @@ fn complex() {
             Ok(total)
             }
     };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn complex_total<
         'any_nd_array4,
         AnyPath0: AsRef<std::path::Path>,
@@ -487,8 +485,8 @@ fn complex() {
     }
     };
 
-    let after = anyinput(quote!(), before);
-    assert_tokens_eq(&after, &expected);
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
 
     pub fn complex_total<
         'any_nd_array4,
@@ -524,19 +522,19 @@ fn complex() {
 
 #[test]
 fn doc_write() -> Result<(), anyhow::Error> {
-    let before = parse_quote! {
+    let before = quote! {
     fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
         Ok(s.len()+2)
     }        };
-    let after = anyinput(quote!(), before);
+    let after = anyinput_core(quote!(), before);
     println!("after: {}", quote! { #after});
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             Ok(s.len() + 2)
         }
     };
-    assert_tokens_eq(&after, &expected);
+    assert_tokens_eq(&expected, &after);
 
     fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
         let s = s.as_ref();
@@ -553,13 +551,13 @@ fn doc_write() -> Result<(), anyhow::Error> {
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_1() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyIter<AnyString,usize>) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 
 #[test]
@@ -567,13 +565,13 @@ fn one_bad_input_1() {
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_2() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyIter<3>) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 
 #[test]
@@ -581,13 +579,13 @@ fn one_bad_input_2() {
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_3() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyIter(AnyString)) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 
 #[test]
@@ -595,13 +593,13 @@ fn one_bad_input_3() {
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_4() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyArray) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 
 #[test]
@@ -609,26 +607,26 @@ fn one_bad_input_4() {
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_5() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyIter) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 #[test]
 #[should_panic(
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_6() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyNdArray) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 
 #[test]
@@ -636,13 +634,13 @@ fn one_bad_input_6() {
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_7() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyString<usize>) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 
 #[test]
@@ -650,25 +648,25 @@ fn one_bad_input_7() {
     expected = "proc-macro-error API cannot be used outside of `entry_point` invocation, perhaps you forgot to annotate your #[proc_macro] function with `#[proc_macro_error]"
 )]
 fn one_bad_input_8() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyPath<usize>) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let _after = anyinput(quote!(), before);
+    let _after = anyinput_core(quote!(), before);
 }
 
 #[test]
 fn see_bed_reader() {
-    let before = parse_quote! {
+    let before = quote! {
      pub fn iid(mut self, iid: AnyIter<AnyString>) -> Self {
          // Unwrap will always work because BedBuilder starting with some metadata
          self.metadata.as_mut().unwrap().set_iid(iid);
          self
      }
     };
-    let after = anyinput(quote!(), before);
+    let after = anyinput_core(quote!(), before);
     println!("after: {}", quote! { #after});
 
     // pub fn iid<AnyString0: AsRef<str>, AnyIter1: IntoIterator<Item = AnyString0>>(
