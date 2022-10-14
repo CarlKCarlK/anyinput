@@ -1,8 +1,9 @@
 #![cfg(test)]
 
 use crate::{anyinput_core, generic_gen_simple_factory, DeltaPatType};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{fold::Fold, parse_quote, ItemFn};
+use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
 
@@ -705,4 +706,31 @@ fn understand_parse_quote() {
     println!("{}", &token_stream);
     println!("{:?}", &token_stream);
     println!("{:#?}", &token_stream);
+}
+
+#[test]
+fn conversion_combinations() {
+    let ts_from_lit_code: TokenStream = quote!(
+        fn hello() {
+            println!("hello world")
+        }
+    );
+    let _struct_from_lit_code: ItemFn = parse_quote!(
+        fn hello() {
+            println!("hello world")
+        }
+    );
+    let string_from_lit_code: String = ts_from_lit_code.to_string();
+    println!("{}", string_from_lit_code);
+    let struct_result_from_ts: Result<ItemFn, syn::Error> =
+        parse2::<ItemFn>(ts_from_lit_code.clone());
+    let struct_from_ts: ItemFn = struct_result_from_ts.unwrap();
+    let _string_from_ts1: String = ts_from_lit_code.to_string();
+    let string_from_ts2: String = format!("{0}\n{0:?}\n{0:#?}", ts_from_lit_code);
+    println!("{}", string_from_ts2);
+    let _ts_from_struct1: TokenStream = struct_from_ts.clone().into_token_stream();
+    let _ts_from_struct2: TokenStream = quote!(#struct_from_ts);
+    let _ts_result_from_string: Result<TokenStream, syn::Error> =
+        parse_str("fn hello() {println!(\"hello world\")}");
+    let _ts_from_string: TokenStream = _ts_result_from_string.unwrap();
 }
