@@ -62,7 +62,7 @@ fn two_inputs() -> anyhow::Result<()> {
         }
     };
     let expected = quote! {
-        pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
+        pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str> >(
             a: AnyString0,
             b: AnyString1
         ) -> Result<usize, anyhow::Error> {
@@ -99,7 +99,7 @@ fn zero_inputs() {
         Ok(len)
     }};
     let expected = quote! {
-    pub fn any_str_len0<>() -> Result<usize, anyhow::Error> {
+    pub fn any_str_len0 () -> Result<usize, anyhow::Error> {
         let len = 0;
         Ok(len)
     }};
@@ -117,7 +117,7 @@ fn one_plus_two_input() -> anyhow::Result<()> {
         }
     };
     let expected = quote! {
-        pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
+        pub fn any_str_len_plus2<AnyString0: AsRef<str> >(
             a: usize,
             s: AnyString0,
             b: usize
@@ -184,7 +184,7 @@ fn one_iter_usize_input() {
         }
     };
     let expected = quote! {
-        pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
+        pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize> >(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter();
@@ -215,7 +215,7 @@ fn one_iter_i32() {
     }
         };
     let expected = quote! {
-        pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
+        pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32> >(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter();
@@ -246,7 +246,7 @@ fn one_iter_t() {
     }
        };
     let expected = quote! {
-        pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
+        pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T> >(
             i: AnyIter0
         ) -> Result<usize, anyhow::Error> {
             let i = i.into_iter();
@@ -316,7 +316,7 @@ fn one_vec_path() {
         }
     };
     let expected = quote! {
-    pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
+    pub fn any_count_vec<AnyPath0: AsRef<std::path::Path> >(
         i: Vec<AnyPath0>
     ) -> Result<usize, anyhow::Error> {
         let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
@@ -362,7 +362,7 @@ fn one_array_usize_input() {
     }
       };
     let expected = quote! {
-        pub fn any_array_len<AnyArray0: AsRef<[usize]>>(
+        pub fn any_array_len<AnyArray0: AsRef<[usize]> >(
             a: AnyArray0
         ) -> Result<usize, anyhow::Error> {
             let a = a.as_ref();
@@ -406,8 +406,7 @@ fn one_ndarray_usize_input() {
     let expected = quote! {
             pub fn any_array_len<
             'any_nd_array1,
-            AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>
-        >(
+            AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize> > >(
             a: AnyNdArray0
         ) -> Result<usize, anyhow::Error> {
             let a = a.into();
@@ -462,9 +461,8 @@ fn complex() {
         'any_nd_array4,
         AnyPath0: AsRef<std::path::Path>,
         AnyArray1: AsRef<[AnyPath0]>,
-        AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
-        AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>
-    >(
+        AnyIter2: IntoIterator<Item = Vec<AnyArray1> >,
+        AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize > > >(
         a: usize,
         b: AnyIter2,
         c: AnyNdArray3
@@ -529,7 +527,7 @@ fn doc_write() -> Result<(), anyhow::Error> {
     let after = anyinput_core(quote!(), before);
     println!("after: {}", quote! { #after});
     let expected = quote! {
-        fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+        fn len_plus_2<AnyString0: AsRef<str> >(s: AnyString0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             Ok(s.len() + 2)
         }
