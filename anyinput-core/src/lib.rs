@@ -26,7 +26,7 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
     // proc_marco2 version of "parse_macro_input!(input as ItemFn)"
     let old_item_fn = match syn::parse2::<ItemFn>(input) {
         Ok(syntax_tree) => syntax_tree,
-        Err(err) => return err.to_compile_error(),
+        Err(error) => return error.to_compile_error(),
     };
 
     let new_item_fn = transform_fn(old_item_fn);

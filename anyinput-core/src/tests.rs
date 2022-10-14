@@ -711,41 +711,43 @@ fn understand_parse_quote() {
 #[test]
 fn conversion_combinations() {
     // Literal code to token stream to strings
-    let tokens_from_lit_code: TokenStream = quote!(
+    let tokens1: TokenStream = quote!(
         fn hello() {
             println!("hello world")
         }
     );
-    let _string_from_tokens1: String = tokens_from_lit_code.to_string();
-    let string_from_tokens2: String = format!(
-        "Code: {0}\nTokens: {0:?}\nPretty Tokens: {0:#?}",
-        tokens_from_lit_code
-    );
-    println!("{}", string_from_tokens2);
+    let _string_of_code: String = tokens1.to_string();
+    let string_from_code_and_tokens: String =
+        format!("Code: {0}\nTokens: {0:?}\nPretty Tokens: {0:#?}", tokens1);
+    println!("{}", string_from_code_and_tokens);
 
     // Literal code to syntax tree to strings
-    let syntax_from_lit_code: ItemFn = parse_quote!(
+    let syntax1: ItemFn = parse_quote!(
         fn hello() {
             println!("hello world")
         }
     );
-    let string_from_syntax: String =
-        format!("Syntax: {0:?}\nPretty Syntax: {0:#?}", syntax_from_lit_code);
-    println!("{}", string_from_syntax);
+    let string_of_syntax: String = format!("Syntax: {0:?}\nPretty Syntax: {0:#?}", syntax1);
+    println!("{}", string_of_syntax);
 
     // Token stream to syntax tree
     // * A "proc-marco" crate uses "parse" or "parse_macro_input!".
     // * A regular crates uses "parse2"
-    let syntax_result_from_tokens: Result<ItemFn, syn::Error> =
-        parse2::<ItemFn>(tokens_from_lit_code);
-    let syntax_from_tokens: ItemFn = syntax_result_from_tokens.unwrap();
+    let syntax2_result: Result<ItemFn, syn::Error> = parse2::<ItemFn>(tokens1);
+    let syntax2: ItemFn = syntax2_result.unwrap();
 
     // Syntax tree to token stream
-    let _tokens_from_syntax1: TokenStream = syntax_from_tokens.clone().into_token_stream();
-    let _tokens_from_syntax2: TokenStream = quote!(#syntax_from_tokens);
+    let _tokens2: TokenStream = syntax2.clone().into_token_stream();
+    let _tokens3: TokenStream = quote!(#syntax2);
 
     // String of code to token stream
-    let _tokens_result_from_string: Result<TokenStream, syn::Error> =
+    let tokens4_result: Result<TokenStream, syn::Error> =
         parse_str("fn hello() {println!(\"hello world\")}");
-    let _tokens_from_string: TokenStream = _tokens_result_from_string.unwrap();
+    let _tokens4: TokenStream = tokens4_result.unwrap();
+
+    // syn::Error to token stream
+    let tokens5_result: Result<TokenStream, syn::Error> =
+        parse_str(">)}fn hello() {println!(\"hello world\")}");
+    let error: syn::Error = tokens5_result.unwrap_err();
+    let _tokens6: TokenStream = error.to_compile_error();
 }
