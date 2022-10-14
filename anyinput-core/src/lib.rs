@@ -4,19 +4,20 @@ mod tests;
 // todo use AST spans test so that problems with the user's syntax are reported correctly
 //           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
-// todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 use std::str::FromStr;
 use strum::EnumString;
-use syn::fold::{fold_type_path, Fold};
+use syn::fold::Fold;
+use syn::Ident;
 use syn::{
-    parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg, GenericArgument,
-    GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType, PathArguments, PathSegment,
-    Signature, Stmt, Type, TypePath,
+    parse2, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
+    GenericArgument, GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType,
+    PathArguments, PathSegment, Signature, Stmt, Type, TypePath,
 };
+
+// todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 
 pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
     if !args.is_empty() {
@@ -24,7 +25,7 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     // proc_marco2 version of "parse_macro_input!(input as ItemFn)"
-    let old_item_fn = match syn::parse2::<ItemFn>(input) {
+    let old_item_fn = match parse2::<ItemFn>(input) {
         Ok(syntax_tree) => syntax_tree,
         Err(error) => return error.to_compile_error(),
     };
@@ -35,18 +36,19 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn transform_fn(old_fn: ItemFn) -> ItemFn {
-    let mut generic_gen = generic_gen_simple_factory();
-    // Start the functions current generic definitions and statements
+    let mut suffix_iter = simple_suffix_iter_factory();
+
+    // start with 1. no function arguments, 2. the old function's generics, 3. the old function's statements
     let init = DeltaFnArgs {
         fn_args: Punctuated::<FnArg, Comma>::new(),
         generic_params: old_fn.sig.generics.params.clone(),
         stmts: old_fn.block.stmts,
     };
 
-    // Transform each old argument of the function, accumulating the new arguments, new generic definitions and new statements
+    // Transform each old argument of the function, accumulating the new argument, new generic definitions and new statements
     let delta_fun_args = (old_fn.sig.inputs)
         .iter()
-        .map(|old_fn_arg| transform_fn_arg(old_fn_arg, &mut generic_gen))
+        .map(|old_fn_arg| transform_fn_arg(old_fn_arg, &mut suffix_iter))
         .fold(init, |mut delta_fun_args, delta_fun_arg| {
             delta_fun_args.merge(delta_fun_arg);
             delta_fun_args
@@ -55,13 +57,12 @@ fn transform_fn(old_fn: ItemFn) -> ItemFn {
     // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
     // // todo Is this the best way to create a new function from an old one?
-    let span = Span::call_site();
     ItemFn {
         sig: Signature {
             generics: Generics {
-                lt_token: Some(syn::Token![<]([span])),
+                lt_token: parse_quote!(<),
                 params: delta_fun_args.generic_params,
-                gt_token: Some(syn::Token![>]([span])),
+                gt_token: parse_quote!(>),
                 ..old_fn.sig.generics.clone()
             },
             inputs: delta_fun_args.fn_args,
@@ -75,7 +76,7 @@ fn transform_fn(old_fn: ItemFn) -> ItemFn {
     }
 }
 
-fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
+fn simple_suffix_iter_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
 }
 #[derive(Debug, Clone, EnumString)]
@@ -154,8 +155,7 @@ impl Special {
         }
     }
 
-    fn pat_ident_to_stmt(&self, pat_ident: &PatIdent) -> Stmt {
-        let name = &pat_ident.ident;
+    fn ident_to_stmt(&self, name: &Ident) -> Stmt {
         match &self {
             Special::AnyArray | Special::AnyString | Special::AnyPath => {
                 parse_quote! {
@@ -211,12 +211,13 @@ struct DeltaFnArg {
 
 fn transform_fn_arg(
     old_fn_arg: &FnArg,
-    generic_gen: &mut impl Iterator<Item = String>,
+    suffix_iter: &mut impl Iterator<Item = String>,
 ) -> DeltaFnArg {
+    // cmk0 is this the beast way to find "normal"?
     // If the function input is normal (not self, not a macro, etc) ...
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // Replace any specials in the type with generics.
-        let (delta_pat_type, new_pat_type) = replace_any_specials(pat_type.clone(), generic_gen);
+        let (delta_pat_type, new_pat_type) = replace_any_specials(pat_type.clone(), suffix_iter);
 
         // Return the new function input, any statements to add, and any new generic definitions.
         DeltaFnArg {
@@ -237,7 +238,7 @@ fn transform_fn_arg(
 impl DeltaPatType<'_> {
     fn generate_any_stmts(&self, pat_ident: &PatIdent) -> Vec<Stmt> {
         if let Some(special) = &self.last_special {
-            vec![special.pat_ident_to_stmt(pat_ident)]
+            vec![special.ident_to_stmt(&pat_ident.ident)]
         } else {
             vec![]
         }
@@ -259,7 +260,7 @@ fn is_normal_fn_arg(fn_arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
 #[allow(clippy::ptr_arg)]
 fn replace_any_specials(
     old_pat_type: PatType,
-    generic_gen: &mut impl Iterator<Item = String>,
+    suffix_iter: &mut impl Iterator<Item = String>,
 ) -> (DeltaPatType, PatType) {
     // Search type and its (sub)subtypes for specials starting at the deepest level.
     // When one is found, replace it with a generic.
@@ -268,7 +269,7 @@ fn replace_any_specials(
 
     let mut delta_pat_type = DeltaPatType {
         generic_params: vec![],
-        generic_gen,
+        suffix_iter,
         last_special: None,
     };
     let new_path_type = delta_pat_type.fold_pat_type(old_pat_type);
@@ -278,7 +279,7 @@ fn replace_any_specials(
 
 struct DeltaPatType<'a> {
     generic_params: Vec<GenericParam>,
-    generic_gen: &'a mut dyn Iterator<Item = String>,
+    suffix_iter: &'a mut dyn Iterator<Item = String>,
     last_special: Option<Special>,
 }
 
@@ -294,18 +295,23 @@ fn camel_case_to_snake_case(s: &str) -> String {
 }
 
 impl Fold for DeltaPatType<'_> {
+    // cmk don't like the names _original and NULL
     fn fold_type_path(&mut self, type_path_original: TypePath) -> TypePath {
-        // println!("fold_type_path (before): {:?}", quote!(#type_path));
+        println!(
+            "fold_type_path (before) code: {}",
+            quote!(#type_path_original)
+        );
+        println!("                      syntax: {:?}", type_path_original);
 
         // Search for any special (sub)subtypes, replacing them with generics.
-        let mut type_path = fold_type_path(self, type_path_original.clone());
+        let mut type_path = syn::fold::fold_type_path(self, type_path_original.clone());
 
         // If this top-level type is special, replace it with a generic.
         if let Some((segment, special)) = is_special_type_path(&type_path) {
             self.last_special = Some(special.clone()); // remember which kind of special found
 
             let suffix = self
-                .generic_gen
+                .suffix_iter
                 .next()
                 .expect("Internal error: ran out of generic suffixes");
             let generic_name = format!("{:?}{}", &special, suffix); // todo implement display and remove "?"
@@ -317,7 +323,7 @@ impl Fold for DeltaPatType<'_> {
 
             let maybe_lifetime = if special.should_add_lifetime() {
                 let suffix = &self
-                    .generic_gen
+                    .suffix_iter
                     .next()
                     .expect("Internal error: ran out of generic suffixes");
                 let snake_case = camel_case_to_snake_case(&format!("{:?}", &special));
@@ -342,7 +348,8 @@ impl Fold for DeltaPatType<'_> {
         } else {
             self.last_special = None;
         }
-        // println!("fold_type_path (after): {}", quote!(#type_path));
+        println!("fold_type_path (after) code: {}", quote!(#type_path));
+        println!("                      syntax: {:?}", type_path);
         type_path
     }
 }
@@ -368,6 +375,8 @@ fn has_sub_type(old_type: &TypePath, args: PathArguments) -> Option<Type> {
 
 fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> {
     // A special type path has exactly one segment and a name from the Special enum.
+    //cmk be sure it doesn't have a qself https://docs.rs/syn/latest/syn/struct.TypePath.html#
+    //cmk is this the best way to check this or could use a match?
     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
         if let Ok(special) = Special::from_str(segment.ident.to_string().as_ref()) {
             Some((segment.clone(), special))

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{anyinput_core, generic_gen_simple_factory, DeltaPatType};
+use crate::{anyinput_core, simple_suffix_iter_factory, DeltaPatType};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn};
@@ -340,10 +340,10 @@ fn one_vec_path() {
 fn fold_one_path() {
     let before = parse_quote! {AnyIter<AnyPath> };
     println!("before: {}", quote!(before));
-    let mut gen = generic_gen_simple_factory();
+    let mut gen = simple_suffix_iter_factory();
     let mut struct1 = DeltaPatType {
         generic_params: vec![],
-        generic_gen: &mut gen,
+        suffix_iter: &mut gen,
         last_special: None,
     };
     let result = struct1.fold_type(before);
@@ -716,7 +716,7 @@ fn conversion_combinations() {
             println!("hello world")
         }
     );
-    let _string_of_code: String = tokens1.to_string();
+    let _string_of_code1: String = tokens1.to_string();
     let string_from_code_and_tokens: String =
         format!("Code: {0}\nTokens: {0:?}\nPretty Tokens: {0:#?}", tokens1);
     println!("{}", string_from_code_and_tokens);
@@ -736,9 +736,11 @@ fn conversion_combinations() {
     let syntax2_result: Result<ItemFn, syn::Error> = parse2::<ItemFn>(tokens1);
     let syntax2: ItemFn = syntax2_result.unwrap();
 
-    // Syntax tree to token stream
+    // Syntax tree to token stream to string of code.
     let _tokens2: TokenStream = syntax2.clone().into_token_stream();
     let _tokens3: TokenStream = quote!(#syntax2);
+    let string_of_code2 = _tokens3.to_string();
+    println!("{}", string_of_code2);
 
     // String of code to token stream
     let tokens4_result: Result<TokenStream, syn::Error> =
