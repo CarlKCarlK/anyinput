@@ -39,7 +39,7 @@ fn one_input() {
     }
        };
     let expected = quote! {
-        pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+        pub fn any_str_len<AnyString0: AsRef<str> >(s: AnyString0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             let len = s.len();
             Ok(len)
@@ -155,7 +155,7 @@ fn one_path_input() {
     }
       };
     let expected = quote! {
-        pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
+        pub fn any_count_path<AnyPath0: AsRef<std::path::Path> >(
             p: AnyPath0
         ) -> Result<usize, anyhow::Error> {
             let p = p.as_ref();

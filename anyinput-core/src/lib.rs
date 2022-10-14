@@ -20,8 +20,6 @@ use syn::{
 fn generic_gen_simple_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
 }
-use quote::quote;
-
 #[derive(Debug, Clone, EnumString)]
 #[allow(clippy::enum_variant_names)]
 enum Special {
