@@ -1,10 +1,15 @@
 #![cfg(test)]
 
-use crate::{generic_gen_simple_factory, transform_fn, DeltaPatType};
+use crate::{anyinput_core, generic_gen_simple_factory, DeltaPatType};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{fold::Fold, parse_quote, ItemFn};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
+
+fn anyinput(args: TokenStream, input: TokenStream) -> TokenStream {
+    anyinput_core(args, input)
+}
 
 fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(after: T0, expected: T1) {
     let after_str = after.to_token_stream().to_string();
@@ -27,13 +32,13 @@ fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(after: T0, expected: T1) {
 
 #[test]
 fn one_input() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_str_len(s: AnyString) -> Result<usize, anyhow::Error> {
         let len = s.len();
         Ok(len)
     }
        };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
             let s = s.as_ref();
             let len = s.len();
@@ -41,7 +46,7 @@ fn one_input() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(after, expected);
 
     pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
@@ -72,7 +77,7 @@ fn two_inputs() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
@@ -102,7 +107,7 @@ fn zero_inputs() {
         Ok(len)
     }};
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 }
 
@@ -126,7 +131,7 @@ fn one_plus_two_input() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
@@ -142,23 +147,14 @@ fn one_plus_two_input() {
 }
 
 #[test]
-fn one_input_uuid() {
-    let before = parse_quote! {pub fn any_str_len(s: AnyString) -> Result<usize, anyhow::Error> {
-        let len = s.len();
-        Ok(len)
-    }};
-    let _ = transform_fn(before, &mut generic_gen_simple_factory());
-}
-
-#[test]
 fn one_path_input() {
-    let before = parse_quote! {
+    let before = quote! {
     pub fn any_count_path(p: AnyPath) -> Result<usize, anyhow::Error> {
         let count = p.iter().count();
         Ok(count)
     }
       };
-    let expected: ItemFn = parse_quote! {
+    let expected = quote! {
         pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
             p: AnyPath0
         ) -> Result<usize, anyhow::Error> {
@@ -168,7 +164,7 @@ fn one_path_input() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
@@ -199,7 +195,7 @@ fn one_iter_usize_input() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
@@ -230,7 +226,7 @@ fn one_iter_i32() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
@@ -261,7 +257,7 @@ fn one_iter_t() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
@@ -295,7 +291,7 @@ fn one_iter_path() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_count_iter<
@@ -329,7 +325,7 @@ fn one_vec_path() {
         Ok(sum_count)
     }};
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
@@ -377,7 +373,7 @@ fn one_array_usize_input() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn any_array_len<AnyArray0: AsRef<[usize]>>(a: AnyArray0) -> Result<usize, anyhow::Error> {
@@ -422,7 +418,7 @@ fn one_ndarray_usize_input() {
         }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     // The lines are long enough that Clippy would like a comma after
@@ -491,7 +487,7 @@ fn complex() {
     }
     };
 
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     assert_tokens_eq(&after, &expected);
 
     pub fn complex_total<
@@ -532,7 +528,7 @@ fn doc_write() -> Result<(), anyhow::Error> {
     fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
         Ok(s.len()+2)
     }        };
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     println!("after: {}", quote! { #after});
     let expected: ItemFn = parse_quote! {
         fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
@@ -563,7 +559,7 @@ fn one_bad_input_1() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 
 #[test]
@@ -577,7 +573,7 @@ fn one_bad_input_2() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 
 #[test]
@@ -591,7 +587,7 @@ fn one_bad_input_3() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 
 #[test]
@@ -605,7 +601,7 @@ fn one_bad_input_4() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 
 #[test]
@@ -619,7 +615,7 @@ fn one_bad_input_5() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 #[test]
 #[should_panic(
@@ -632,7 +628,7 @@ fn one_bad_input_6() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 
 #[test]
@@ -646,7 +642,7 @@ fn one_bad_input_7() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 
 #[test]
@@ -660,7 +656,7 @@ fn one_bad_input_8() {
         Ok(len)
     }
        };
-    let _after = transform_fn(before, &mut generic_gen_simple_factory());
+    let _after = anyinput(quote!(), before);
 }
 
 #[test]
@@ -672,7 +668,7 @@ fn see_bed_reader() {
          self
      }
     };
-    let after = transform_fn(before, &mut generic_gen_simple_factory());
+    let after = anyinput(quote!(), before);
     println!("after: {}", quote! { #after});
 
     // pub fn iid<AnyString0: AsRef<str>, AnyIter1: IntoIterator<Item = AnyString0>>(

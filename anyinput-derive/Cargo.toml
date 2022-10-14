@@ -22,3 +22,4 @@ ndarray = ["anyinput-core/ndarray"]
 [dependencies]
 anyinput-core = { version = "0.1.5", path = "../anyinput-core" }
 proc-macro-error = "1.0"
+proc-macro2 = "1.0"
