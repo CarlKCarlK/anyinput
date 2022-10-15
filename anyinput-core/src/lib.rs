@@ -294,8 +294,8 @@ fn camel_case_to_snake_case(s: &str) -> String {
 
 impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path_old: TypePath) -> TypePath {
-        println!("fold_type_path (before) code: {}", quote!(#type_path_old));
-        println!("                      syntax: {:?}", type_path_old);
+        // println!("fold_type_path (before) code: {}", quote!(#type_path_old));
+        // println!("                      syntax: {:?}", type_path_old);
 
         // Search for any special (sub)subtypes, replacing them with generics.
         let type_path_middle = syn::fold::fold_type_path(self, type_path_old.clone());

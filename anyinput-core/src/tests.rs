@@ -3,7 +3,7 @@
 use crate::{anyinput_core, simple_suffix_iter_factory, DeltaPatType};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn};
+use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn, Stmt};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
 
@@ -752,4 +752,38 @@ fn conversion_combinations() {
         parse_str(">)}fn hello() {println!(\"hello world\")}");
     let error: syn::Error = tokens5_result.unwrap_err();
     let _tokens6: TokenStream = error.to_compile_error();
+}
+struct StmtCounter {
+    count: usize,
+}
+
+impl Fold for StmtCounter {
+    fn fold_stmt(&mut self, stmt_old: Stmt) -> Stmt {
+        let stmt_middle = syn::fold::fold_stmt(self, stmt_old);
+        println!("stmt #{}: {}", self.count, quote!(#stmt_middle));
+        self.count += 1;
+
+        if quote!(#stmt_middle).to_string().contains("galaxy") {
+            parse_quote!(println!("hello universe");)
+        } else {
+            stmt_middle
+        }
+    }
+}
+
+#[test]
+fn count_statements() {
+    let mut stmt_counter = StmtCounter { count: 0 };
+    let item_fn_old: ItemFn = parse_quote! {
+        fn hello() {
+            println!("hello world");
+            {
+                println!("hello solar system");
+                println!("hello galaxy");
+            }
+        }
+    };
+    let item_fn_new = stmt_counter.fold_item_fn(item_fn_old);
+    println!("item_fn_new: {}", quote!(#item_fn_new));
+    println!("count: {}", stmt_counter.count);
 }
