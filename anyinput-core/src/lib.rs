@@ -200,6 +200,39 @@ impl Special {
             Special::AnyNdArray => true,
         }
     }
+
+    fn maybe_new(type_path: &TypePath, span_range: &SpanRange) -> Option<(Special, Option<Type>)> {
+        // A special type path has exactly one segment and a name from the Special enum.
+        //cmk be sure it doesn't have a qself https://docs.rs/syn/latest/syn/struct.TypePath.html#
+        //cmk is this the best way to check this or could use a match?
+        if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
+            if let Ok(special) = Special::from_str(segment.ident.to_string().as_ref()) {
+                let maybe_sub_type = Special::create_maybe_sub_type(&segment.arguments, span_range);
+                return Some((special, maybe_sub_type));
+            }
+        }
+        None
+    }
+
+    fn create_maybe_sub_type(args: &PathArguments, span_range: &SpanRange) -> Option<Type> {
+        match args {
+            PathArguments::None => None,
+            PathArguments::AngleBracketed(ref args) => {
+                let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
+                    abort!(span_range, "Expected at exactly one generic parameter.")
+                });
+                // println!("arg: {}", quote!(#arg));
+                if let GenericArgument::Type(sub_type2) = arg {
+                    Some(sub_type2.clone())
+                } else {
+                    abort!(span_range, "Expected generic parameter to be a type.")
+                }
+            }
+            PathArguments::Parenthesized(_) => {
+                abort!(span_range, "Expected <..> generic parameter.")
+            }
+        }
+    }
 }
 
 // If a function argument contains a special type(s), re-write it.
@@ -303,11 +336,13 @@ impl Fold for DeltaPatType<'_> {
         // Apply "fold" recursively to process specials in subtypes, for example, Vec<AnyString>.
         let type_path_middle = syn::fold::fold_type_path(self, type_path_old);
 
+        let span_range = SpanRange::from_tokens(&type_path_middle); // used by abort!
+
         // If this type is special, replace it with a generic.
-        if let Some((special, args)) = create_maybe_special(&type_path_middle) {
+        if let Some((special, maybe_sub_types)) = Special::maybe_new(&type_path_middle, &span_range)
+        {
             self.last_special = Some(special.clone()); // remember the special found (used for stmt generation)
-            let span_range = SpanRange::from_tokens(&type_path_middle);
-            self.create_and_define_generic(special, args, &span_range)
+            self.create_and_define_generic(special, maybe_sub_types, &span_range)
         } else {
             self.last_special = None;
             type_path_middle
@@ -320,11 +355,10 @@ impl<'a> DeltaPatType<'a> {
     fn create_and_define_generic(
         &mut self,
         special: Special,
-        args: PathArguments,
+        maybe_sub_type: Option<Type>,
         span_range: &SpanRange,
     ) -> TypePath {
         let generic = self.create_generic(&special); // for example, "AnyString3"
-        let maybe_sub_type = create_maybe_sub_type(args, span_range);
         let maybe_lifetime = self.create_maybe_lifetime(&special);
         let generic_param =
             special.special_to_generic_param(&generic, maybe_sub_type, maybe_lifetime, span_range);
@@ -352,7 +386,6 @@ impl<'a> DeltaPatType<'a> {
             .next()
             .expect("Internal error: ran out of generic suffixes");
         let generic_name = format!("{}{}", &special, suffix);
-        // cmk implement display and remove "?"
         // cmk use syn's parse_ident(?)?
 
         parse_str(&generic_name).expect("Internal error: failed to parse generic name")
@@ -364,8 +397,7 @@ impl<'a> DeltaPatType<'a> {
             .suffix_iter
             .next()
             .expect("Internal error: ran out of generic suffixes");
-        // cmk implement display and remove "?"
-        let snake_case = camel_case_to_snake_case(&format!("{:?}", &special));
+        let snake_case = camel_case_to_snake_case(&format!("{}", &special));
         let lifetime_name = format!("'{}{}", snake_case, suffix,);
         let lifetime: Lifetime =
             parse_str(&lifetime_name).expect("Internal error: failed to parse lifetime name");
@@ -373,38 +405,6 @@ impl<'a> DeltaPatType<'a> {
     }
 }
 
-fn create_maybe_sub_type(args: PathArguments, span_range: &SpanRange) -> Option<Type> {
-    match args {
-        PathArguments::None => None,
-        PathArguments::AngleBracketed(ref args) => {
-            let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
-                abort!(span_range, "Expected at exactly one generic parameter.")
-            });
-            // println!("arg: {}", quote!(#arg));
-            if let GenericArgument::Type(sub_type2) = arg {
-                Some(sub_type2.clone())
-            } else {
-                abort!(span_range, "Expected generic parameter to be a type.")
-            }
-        }
-        PathArguments::Parenthesized(_) => {
-            abort!(span_range, "Expected <..> generic parameter.")
-        }
-    }
-}
-
-// cmk make a method of Special
-fn create_maybe_special(type_path: &TypePath) -> Option<(Special, PathArguments)> {
-    // A special type path has exactly one segment and a name from the Special enum.
-    //cmk be sure it doesn't have a qself https://docs.rs/syn/latest/syn/struct.TypePath.html#
-    //cmk is this the best way to check this or could use a match?
-    if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-        if let Ok(special) = Special::from_str(segment.ident.to_string().as_ref()) {
-            return Some((special, segment.arguments.clone()));
-        }
-    }
-    None
-}
 // Utility that tells if an iterator contains exactly one element.
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     let first = iter.next()?;
