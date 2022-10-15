@@ -276,6 +276,41 @@ fn one_iter_t() {
 }
 
 #[test]
+fn one_iter_t_where() {
+    let before = quote! {
+    pub fn any_count_iter<T>(i: AnyIter<T>) -> Result<usize, anyhow::Error>
+    where T: Copy
+     {
+        let count = i.count();
+        Ok(count)
+    }
+       };
+    let expected = quote! {
+    pub fn any_count_iter<T, AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        T: Copy,
+        AnyIter0: IntoIterator<Item = T>
+    {
+        let i = i.into_iter();
+        let count = i.count();
+        Ok(count)
+    }    };
+
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
+
+    pub fn any_count_iter<T, AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        T: Copy,
+        AnyIter0: IntoIterator<Item = T>,
+    {
+        let i = i.into_iter();
+        let count = i.count();
+        Ok(count)
+    }
+    assert_eq!(any_count_iter([1, 2, 3]).unwrap(), 3);
+}
+#[test]
 fn one_iter_path() {
     let before = quote! {
     pub fn any_count_iter(i: AnyIter<AnyPath>) -> Result<usize, anyhow::Error> {

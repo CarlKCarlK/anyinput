@@ -31,7 +31,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anyinput = { version = "0.1.5", features = ["ndarray"] }
+anyinput = { version = "0.1.6", features = ["ndarray"] }
 ```
 
 If you don't need `NdArray` support, omit the `ndarray` feature.
