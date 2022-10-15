@@ -81,7 +81,7 @@ impl DeltaFnArgList {
     fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
         self.generic_params.extend(delta_fn_arg.generic_params);
-        for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
+        for (index, stmt) in delta_fn_arg.stmt.into_iter().enumerate() {
             self.stmts.insert(index, stmt);
         }
     }
@@ -203,7 +203,7 @@ fn transform_fn_arg(
         // Return the new function input, any statements to add, and any new generic definitions.
         DeltaFnArg {
             fn_arg: FnArg::Typed(new_pat_type),
-            stmts: delta_pat_type.generate_any_stmts(pat_ident),
+            stmt: delta_pat_type.generate_any_stmt(pat_ident),
             generic_params: delta_pat_type.generic_params,
         }
     } else {
@@ -211,7 +211,7 @@ fn transform_fn_arg(
         DeltaFnArg {
             fn_arg: old_fn_arg.clone(),
             generic_params: vec![],
-            stmts: vec![],
+            stmt: None,
         }
     }
 }
@@ -221,18 +221,19 @@ fn transform_fn_arg(
 struct DeltaFnArg {
     fn_arg: FnArg,
     generic_params: Vec<GenericParam>,
-    stmts: Vec<Stmt>,
+    stmt: Option<Stmt>,
 }
 
 impl DeltaPatType<'_> {
-    fn generate_any_stmts(&self, pat_ident: &PatIdent) -> Vec<Stmt> {
+    fn generate_any_stmt(&self, pat_ident: &PatIdent) -> Option<Stmt> {
         // If the top-level type is a special, add a statement to convert
         // from its generic type to to a concrete type.
         // For example,  "let x = x.into_iter();" for AnyIter.
         if let Some(special) = &self.last_special {
-            vec![special.ident_to_stmt(&pat_ident.ident)]
+            let stmt = special.ident_to_stmt(&pat_ident.ident);
+            Some(stmt)
         } else {
-            vec![]
+            None
         }
     }
 }
