@@ -122,7 +122,9 @@ impl Special {
                     maybe_lifetime.is_none(),
                     "AnyString should not have a lifetime."
                 );
-                parse_quote!(#generic : AsRef<str>)
+                parse_quote! {
+                    #generic : AsRef<str>
+                }
             }
             Special::AnyPath => {
                 if maybe_sub_type.is_some() {
@@ -132,7 +134,9 @@ impl Special {
                     maybe_lifetime.is_none(),
                     "AnyPath should not have a lifetime."
                 );
-                parse_quote!(#generic : AsRef<std::path::Path>)
+                parse_quote! {
+                    #generic : AsRef<std::path::Path>
+                }
             }
             Special::AnyArray => {
                 let sub_type = match maybe_sub_type {
@@ -145,7 +149,9 @@ impl Special {
                     maybe_lifetime.is_none(),
                     "AnyArray should not have a lifetime."
                 );
-                parse_quote!(#generic : AsRef<[#sub_type]>)
+                parse_quote! {
+                    #generic : AsRef<[#sub_type]>
+                }
             }
             Special::AnyIter => {
                 let sub_type = match maybe_sub_type {
@@ -158,7 +164,9 @@ impl Special {
                     maybe_lifetime.is_none(),
                     "AnyIter should not have a lifetime."
                 );
-                parse_quote!(#generic : IntoIterator<Item = #sub_type>)
+                parse_quote! {
+                    #generic : IntoIterator<Item = #sub_type>
+                }
             }
             Special::AnyNdArray => {
                 let sub_type = match maybe_sub_type {
@@ -169,7 +177,9 @@ impl Special {
                 };
                 let lifetime =
                     maybe_lifetime.expect("Internal error: AnyNdArray should be given a lifetime.");
-                parse_quote!(#generic: Into<ndarray::ArrayView1<#lifetime, #sub_type>>)
+                parse_quote! {
+                    #generic: Into<ndarray::ArrayView1<#lifetime, #sub_type>>
+                }
             }
         }
     }
@@ -373,7 +383,7 @@ impl<'a> DeltaPatType<'a> {
     fn create_maybe_lifetime(&mut self, special: &Special) -> Option<Lifetime> {
         if special.should_add_lifetime() {
             let lifetime = self.create_lifetime(special);
-            let generic_param: GenericParam = parse_quote! { #lifetime };
+            let generic_param: GenericParam = parse_quote!(#lifetime);
             self.generic_params.push(generic_param);
 
             Some(lifetime)

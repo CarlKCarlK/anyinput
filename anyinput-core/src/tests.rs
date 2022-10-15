@@ -747,6 +747,10 @@ fn conversion_combinations() {
         parse_str("fn hello() {println!(\"hello world\")}");
     let _tokens4: TokenStream = tokens4_result.unwrap();
 
+    let syntax3_result: Result<ItemFn, syn::Error> =
+        parse_str("fn hello() {println!(\"hello world\")}");
+    let _syntax3: ItemFn = syntax3_result.unwrap();
+
     // syn::Error to token stream
     let tokens5_result: Result<TokenStream, syn::Error> =
         parse_str(">)}fn hello() {println!(\"hello world\")}");
