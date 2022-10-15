@@ -2,17 +2,18 @@
 
 mod tests;
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use proc_macro_error::abort;
 use quote::quote;
 use std::str::FromStr;
 use strum::EnumString;
 use syn::fold::Fold;
+use syn::spanned::Spanned;
 use syn::Ident;
 use syn::{
     parse2, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
     GenericArgument, GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType,
-    PathArguments, PathSegment, Signature, Stmt, Type, TypePath,
+    PathArguments, Signature, Stmt, Type, TypePath,
 };
 
 pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -108,56 +109,68 @@ enum Special {
 impl Special {
     fn special_to_generic_param(
         &self,
-        old_type: &TypePath,
-        new_type: &TypePath,
-        sub_type: Option<&Type>,
-        lifetime: Option<Lifetime>,
+        generic: &TypePath,
+        maybe_sub_type: Option<Type>,
+        maybe_lifetime: Option<Lifetime>,
+        span: &Span,
     ) -> GenericParam {
         match &self {
             Special::AnyString => {
-                if sub_type.is_some() {
-                    abort!(old_type,"AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
+                if maybe_sub_type.is_some() {
+                    abort!(span,"AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
                 };
-                assert!(lifetime.is_none(), "AnyString should not have a lifetime.");
-                parse_quote!(#new_type : AsRef<str>)
+                assert!(
+                    maybe_lifetime.is_none(),
+                    "AnyString should not have a lifetime."
+                );
+                parse_quote!(#generic : AsRef<str>)
             }
             Special::AnyPath => {
-                if sub_type.is_some() {
-                    abort!(old_type,"AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
+                if maybe_sub_type.is_some() {
+                    abort!(span,"AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
                 };
-                assert!(lifetime.is_none(), "AnyPath should not have a lifetime.");
-                parse_quote!(#new_type : AsRef<std::path::Path>)
+                assert!(
+                    maybe_lifetime.is_none(),
+                    "AnyPath should not have a lifetime."
+                );
+                parse_quote!(#generic : AsRef<std::path::Path>)
             }
             Special::AnyArray => {
-                let sub_type = match sub_type {
+                let sub_type = match maybe_sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        abort!(old_type,"AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
+                        abort!(span,"AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
                     }
                 };
-                assert!(lifetime.is_none(), "AnyArray should not have a lifetime.");
-                parse_quote!(#new_type : AsRef<[#sub_type]>)
+                assert!(
+                    maybe_lifetime.is_none(),
+                    "AnyArray should not have a lifetime."
+                );
+                parse_quote!(#generic : AsRef<[#sub_type]>)
             }
             Special::AnyIter => {
-                let sub_type = match sub_type {
+                let sub_type = match maybe_sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        abort!(old_type,"AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
+                        abort!(span,"AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
                     }
                 };
-                assert!(lifetime.is_none(), "AnyIter should not have a lifetime.");
-                parse_quote!(#new_type : IntoIterator<Item = #sub_type>)
+                assert!(
+                    maybe_lifetime.is_none(),
+                    "AnyIter should not have a lifetime."
+                );
+                parse_quote!(#generic : IntoIterator<Item = #sub_type>)
             }
             Special::AnyNdArray => {
-                match sub_type {
+                let sub_type = match maybe_sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        abort!(old_type,"AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
+                        abort!(span,"AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
                     }
                 };
                 let lifetime =
-                    lifetime.expect("Internal error: AnyNdArray should be given a lifetime.");
-                parse_quote!(#new_type: Into<ndarray::ArrayView1<#lifetime, #sub_type>>)
+                    maybe_lifetime.expect("Internal error: AnyNdArray should be given a lifetime.");
+                parse_quote!(#generic: Into<ndarray::ArrayView1<#lifetime, #sub_type>>)
             }
         }
     }
@@ -288,95 +301,113 @@ fn camel_case_to_snake_case(s: &str) -> String {
 
 impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path_old: TypePath) -> TypePath {
-        // println!("fold_type_path (before) code: {}", quote!(#type_path_old));
-        // println!("                      syntax: {:?}", type_path_old);
-
-        // Search for any special (sub)subtypes, replacing them with generics.
+        // Apply "fold" recursively to process specials in subtypes, for example, Vec<AnyString>.
         let type_path_middle = syn::fold::fold_type_path(self, type_path_old.clone());
 
-        // If this top-level type is special, replace it with a generic.
-        if let Some((segment, special)) = is_special_type_path(&type_path_middle) {
-            self.last_special = Some(special.clone()); // remember which kind of special found
-
-            let suffix = self
-                .suffix_iter
-                .next()
-                .expect("Internal error: ran out of generic suffixes");
-            let generic_name = format!("{:?}{}", &special, suffix); // todo implement display and remove "?"
-            let type_path_new =
-                parse_str(&generic_name).expect("Internal error: failed to parse generic name");
-
-            // Define the generic type, e.g. S23: AsRef<str>, and remember it.
-            let sub_type = has_sub_type(&type_path_old, segment.arguments); // Find anything inside angle brackets.
-
-            let maybe_lifetime = if special.should_add_lifetime() {
-                let suffix = &self
-                    .suffix_iter
-                    .next()
-                    .expect("Internal error: ran out of generic suffixes");
-                let snake_case = camel_case_to_snake_case(&format!("{:?}", &special));
-                let lifetime_name = format!("'{}{}", snake_case, suffix,);
-                let lifetime: Lifetime = parse_str(&lifetime_name)
-                    .expect("Internal error: failed to parse lifetime name");
-                let generic_param: GenericParam = parse_quote! { #lifetime };
-                self.generic_params.push(generic_param);
-
-                Some(lifetime)
-            } else {
-                None
-            };
-
-            let generic_param = special.special_to_generic_param(
-                &type_path_old,
-                &type_path_new,
-                sub_type.as_ref(),
-                maybe_lifetime,
-            );
-            self.generic_params.push(generic_param);
-            println!("fold_type_path (after) code: {}", quote!(#type_path_new));
-            println!("                      syntax: {:?}", type_path_new);
-            type_path_new
+        // If this type is special, replace it with a generic.
+        if let Some((special, args)) = create_maybe_special(&type_path_middle) {
+            self.last_special = Some(special.clone()); // remember the special found (used for stmt generation)
+            let generic = self.create_generic(&special); // for example, "AnyString3"
+            self.define_generic(&generic, special, args, &type_path_old.span()); // for example, "AnyString3: AsRef<str>"
+            generic
         } else {
             self.last_special = None;
-            println!("fold_type_path (after) code: {}", quote!(#type_path_middle));
-            println!("                      syntax: {:?}", type_path_middle);
             type_path_middle
         }
     }
 }
 
-fn has_sub_type(old_type: &TypePath, args: PathArguments) -> Option<Type> {
-    match args {
-        PathArguments::None => None,
-        PathArguments::AngleBracketed(ref args) => {
-            let arg = first_and_only(args.args.iter())
-                .unwrap_or_else(|| abort!(old_type, "Expected at exactly one generic parameter."));
-            // println!("arg: {}", quote!(#arg));
-            if let GenericArgument::Type(sub_type2) = arg {
-                Some(sub_type2.clone())
-            } else {
-                abort!(old_type, "Expected generic parameter to be a type.")
-            }
-        }
-        PathArguments::Parenthesized(_) => {
-            abort!(old_type, "Expected <..> generic parameter.")
+impl<'a> DeltaPatType<'a> {
+    // Define the generic type, for example, "AnyString3: AsRef<str>", and remember the definition.
+    fn define_generic(
+        &mut self,
+        generic: &TypePath,
+        special: Special,
+        args: PathArguments,
+        span: &Span,
+    ) {
+        let maybe_sub_type = create_maybe_sub_type(args, span);
+        let maybe_lifetime = self.create_maybe_lifetime(&special);
+        let generic_param =
+            special.special_to_generic_param(generic, maybe_sub_type, maybe_lifetime, span);
+        self.generic_params.push(generic_param);
+    }
+}
+
+impl<'a> DeltaPatType<'a> {
+    // create a lifetime if needed, for example, Some('any_nd_array_3) or None
+    fn create_maybe_lifetime(&mut self, special: &Special) -> Option<Lifetime> {
+        if special.should_add_lifetime() {
+            let lifetime = self.create_lifetime(special);
+            let generic_param: GenericParam = parse_quote! { #lifetime };
+            self.generic_params.push(generic_param);
+
+            Some(lifetime)
+        } else {
+            None
         }
     }
 }
 
-fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> {
+impl<'a> DeltaPatType<'a> {
+    // Create a new generic type, for example, "AnyString3"
+    fn create_generic(&mut self, special: &Special) -> TypePath {
+        let suffix = self
+            .suffix_iter
+            .next()
+            .expect("Internal error: ran out of generic suffixes");
+        let generic_name = format!("{:?}{}", &special, suffix);
+        // cmk implement display and remove "?"
+        // cmk use syn's parse_ident(?)?
+
+        parse_str(&generic_name).expect("Internal error: failed to parse generic name")
+    }
+
+    // Create a new lifetime, for example, "'any_nd_array_4"
+    fn create_lifetime(&mut self, special: &Special) -> Lifetime {
+        let suffix = &self
+            .suffix_iter
+            .next()
+            .expect("Internal error: ran out of generic suffixes");
+        // cmk implement display and remove "?"
+        let snake_case = camel_case_to_snake_case(&format!("{:?}", &special));
+        let lifetime_name = format!("'{}{}", snake_case, suffix,);
+        let lifetime: Lifetime =
+            parse_str(&lifetime_name).expect("Internal error: failed to parse lifetime name");
+        lifetime
+    }
+}
+
+fn create_maybe_sub_type(args: PathArguments, span: &Span) -> Option<Type> {
+    match args {
+        PathArguments::None => None,
+        PathArguments::AngleBracketed(ref args) => {
+            let arg = first_and_only(args.args.iter())
+                .unwrap_or_else(|| abort!(span, "Expected at exactly one generic parameter."));
+            // println!("arg: {}", quote!(#arg));
+            if let GenericArgument::Type(sub_type2) = arg {
+                Some(sub_type2.clone())
+            } else {
+                abort!(span, "Expected generic parameter to be a type.")
+            }
+        }
+        PathArguments::Parenthesized(_) => {
+            abort!(span, "Expected <..> generic parameter.")
+        }
+    }
+}
+
+// cmk make a method of Special
+fn create_maybe_special(type_path: &TypePath) -> Option<(Special, PathArguments)> {
     // A special type path has exactly one segment and a name from the Special enum.
     //cmk be sure it doesn't have a qself https://docs.rs/syn/latest/syn/struct.TypePath.html#
     //cmk is this the best way to check this or could use a match?
     if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
         if let Ok(special) = Special::from_str(segment.ident.to_string().as_ref()) {
-            Some((segment.clone(), special))
-        } else {
-            None
+            return Some((special, segment.arguments.clone()));
         }
-    } else {
-        None
     }
+    None
 }
 // Utility that tells if an iterator contains exactly one element.
 fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
