@@ -109,7 +109,7 @@ enum Special {
 impl Special {
     fn special_to_generic_param(
         &self,
-        generic: &TypePath,
+        generic: &TypePath, // for example: AnyArray0
         maybe_sub_type: Option<Type>,
         maybe_lifetime: Option<Lifetime>,
         span: &Span,
@@ -307,9 +307,7 @@ impl Fold for DeltaPatType<'_> {
         // If this type is special, replace it with a generic.
         if let Some((special, args)) = create_maybe_special(&type_path_middle) {
             self.last_special = Some(special.clone()); // remember the special found (used for stmt generation)
-            let generic = self.create_generic(&special); // for example, "AnyString3"
-            self.define_generic(&generic, special, args, &type_path_old.span()); // for example, "AnyString3: AsRef<str>"
-            generic
+            self.create_and_define_generic(special, args, &type_path_old.span())
         } else {
             self.last_special = None;
             type_path_middle
@@ -319,22 +317,21 @@ impl Fold for DeltaPatType<'_> {
 
 impl<'a> DeltaPatType<'a> {
     // Define the generic type, for example, "AnyString3: AsRef<str>", and remember the definition.
-    fn define_generic(
+    fn create_and_define_generic(
         &mut self,
-        generic: &TypePath,
         special: Special,
         args: PathArguments,
         span: &Span,
-    ) {
+    ) -> TypePath {
+        let generic = self.create_generic(&special); // for example, "AnyString3"
         let maybe_sub_type = create_maybe_sub_type(args, span);
         let maybe_lifetime = self.create_maybe_lifetime(&special);
         let generic_param =
-            special.special_to_generic_param(generic, maybe_sub_type, maybe_lifetime, span);
+            special.special_to_generic_param(&generic, maybe_sub_type, maybe_lifetime, span);
         self.generic_params.push(generic_param);
+        generic
     }
-}
 
-impl<'a> DeltaPatType<'a> {
     // create a lifetime if needed, for example, Some('any_nd_array_3) or None
     fn create_maybe_lifetime(&mut self, special: &Special) -> Option<Lifetime> {
         if special.should_add_lifetime() {
@@ -347,9 +344,7 @@ impl<'a> DeltaPatType<'a> {
             None
         }
     }
-}
 
-impl<'a> DeltaPatType<'a> {
     // Create a new generic type, for example, "AnyString3"
     fn create_generic(&mut self, special: &Special) -> TypePath {
         let suffix = self
