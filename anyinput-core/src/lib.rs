@@ -8,11 +8,11 @@ use quote::quote;
 use std::str::FromStr;
 use strum::{Display, EnumString};
 use syn::fold::Fold;
-use syn::Ident;
+use syn::WhereClause;
 use syn::{
     parse2, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
-    GenericArgument, GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType,
-    PathArguments, Signature, Stmt, Type, TypePath,
+    GenericArgument, GenericParam, Generics, Ident, ItemFn, Lifetime, Pat, PatIdent, PatType,
+    PathArguments, Signature, Stmt, Type, TypePath, WherePredicate,
 };
 
 pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -35,9 +35,17 @@ fn transform_fn(old_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
 
     // Start with 1. no function arguments, 2. the old function's generics, 3. the old function's statements
+    // cmk make own function
+    let where_clause =
+        if let Some(WhereClause { predicates, .. }) = old_fn.sig.generics.where_clause.clone() {
+            predicates
+        } else {
+            parse_quote!()
+        };
     let init = DeltaFnArgList {
         fn_args: Punctuated::<FnArg, Comma>::new(),
         generic_params: old_fn.sig.generics.params.clone(),
+        where_predicates: where_clause,
         stmts: old_fn.block.stmts,
     };
 
@@ -52,13 +60,17 @@ fn transform_fn(old_fn: ItemFn) -> ItemFn {
 
     // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
+    // cmk println!("predicates: {}", quote!(#_predicates));
     ItemFn {
         sig: Signature {
             generics: Generics {
                 lt_token: parse_quote!(<),
                 params: delta_fun_arg_list.generic_params,
                 gt_token: parse_quote!(>),
-                ..old_fn.sig.generics.clone()
+                where_clause: Some(WhereClause {
+                    where_token: parse_quote!(where),
+                    predicates: delta_fun_arg_list.where_predicates,
+                }),
             },
             inputs: delta_fun_arg_list.fn_args,
             ..old_fn.sig.clone()
@@ -74,6 +86,7 @@ fn transform_fn(old_fn: ItemFn) -> ItemFn {
 struct DeltaFnArgList {
     fn_args: Punctuated<FnArg, Comma>,
     generic_params: Punctuated<GenericParam, Comma>,
+    where_predicates: Punctuated<WherePredicate, Comma>,
     stmts: Vec<Stmt>,
 }
 
@@ -81,6 +94,7 @@ impl DeltaFnArgList {
     fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
         self.generic_params.extend(delta_fn_arg.generic_params);
+        self.where_predicates.extend(delta_fn_arg.where_predicates);
         for (index, stmt) in delta_fn_arg.stmt.into_iter().enumerate() {
             self.stmts.insert(index, stmt);
         }
@@ -106,13 +120,13 @@ enum Special {
 }
 
 impl Special {
-    fn special_to_generic_param(
+    fn special_to_where_predicate(
         &self,
         generic: &TypePath, // for example: AnyArray0
         maybe_sub_type: Option<Type>,
         maybe_lifetime: Option<Lifetime>,
         span: &SpanRange,
-    ) -> GenericParam {
+    ) -> WherePredicate {
         match &self {
             Special::AnyString => {
                 if maybe_sub_type.is_some() {
@@ -274,12 +288,14 @@ fn transform_fn_arg(
             fn_arg: FnArg::Typed(new_pat_type),
             stmt: delta_pat_type.generate_any_stmt(pat_ident),
             generic_params: delta_pat_type.generic_params,
+            where_predicates: delta_pat_type.where_predicates,
         }
     } else {
         // if input is not normal, return it unchanged.
         DeltaFnArg {
             fn_arg: old_fn_arg.clone(),
             generic_params: vec![],
+            where_predicates: vec![],
             stmt: None,
         }
     }
@@ -290,6 +306,7 @@ fn transform_fn_arg(
 struct DeltaFnArg {
     fn_arg: FnArg,
     generic_params: Vec<GenericParam>,
+    where_predicates: Vec<WherePredicate>,
     stmt: Option<Stmt>,
 }
 
@@ -329,7 +346,9 @@ fn replace_any_specials(
     suffix_iter: &mut impl Iterator<Item = String>,
 ) -> (DeltaPatType, PatType) {
     let mut delta_pat_type = DeltaPatType {
+        // cmk define default method?
         generic_params: vec![],
+        where_predicates: vec![],
         suffix_iter,
         last_special: None,
     };
@@ -340,6 +359,7 @@ fn replace_any_specials(
 
 struct DeltaPatType<'a> {
     generic_params: Vec<GenericParam>,
+    where_predicates: Vec<WherePredicate>,
     suffix_iter: &'a mut dyn Iterator<Item = String>,
     last_special: Option<Special>,
 }
@@ -373,9 +393,15 @@ impl<'a> DeltaPatType<'a> {
     ) -> TypePath {
         let generic = self.create_generic(&special); // for example, "AnyString3"
         let maybe_lifetime = self.create_maybe_lifetime(&special);
-        let generic_param =
-            special.special_to_generic_param(&generic, maybe_sub_type, maybe_lifetime, span_range);
+        let where_predicate = special.special_to_where_predicate(
+            &generic,
+            maybe_sub_type,
+            maybe_lifetime,
+            span_range,
+        );
+        let generic_param: GenericParam = parse_quote!(#generic);
         self.generic_params.push(generic_param);
+        self.where_predicates.push(where_predicate);
         generic
     }
 

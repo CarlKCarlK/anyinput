@@ -34,17 +34,23 @@ fn one_input() -> anyhow::Result<()> {
     }
        };
     let expected = quote! {
-        pub fn any_str_len<AnyString0: AsRef<str> >(s: AnyString0) -> Result<usize, anyhow::Error> {
-            let s = s.as_ref();
-            let len = s.len();
-            Ok(len)
-        }
+    pub fn any_str_len<AnyString0>(s: AnyString0) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>
+    {
+        let s = s.as_ref();
+        let len = s.len();
+        Ok(len)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_str_len<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+    pub fn any_str_len<AnyString0>(s: AnyString0) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>,
+    {
         let s = s.as_ref();
         let len = s.len();
         Ok(len)
@@ -343,6 +349,7 @@ fn fold_one_path() {
     let mut gen = simple_suffix_iter_factory();
     let mut struct1 = DeltaPatType {
         generic_params: vec![],
+        where_predicates: vec![],
         suffix_iter: &mut gen,
         last_special: None,
     };
@@ -761,6 +768,7 @@ fn conversion_combinations() {
         parse_str(">)}fn hello() {println!(\"hello world\")}");
     let error: syn::Error = tokens5_result.unwrap_err();
     let _tokens6: TokenStream = error.to_compile_error();
+    // cmk replace prints with asserts
 }
 struct StmtCounter {
     count: usize,
