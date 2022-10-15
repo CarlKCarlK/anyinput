@@ -203,12 +203,13 @@ impl Special {
 
     fn maybe_new(type_path: &TypePath, span_range: &SpanRange) -> Option<(Special, Option<Type>)> {
         // A special type path has exactly one segment and a name from the Special enum.
-        //cmk be sure it doesn't have a qself https://docs.rs/syn/latest/syn/struct.TypePath.html#
-        //cmk is this the best way to check this or could use a match?
-        if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
-            if let Ok(special) = Special::from_str(segment.ident.to_string().as_ref()) {
-                let maybe_sub_type = Special::create_maybe_sub_type(&segment.arguments, span_range);
-                return Some((special, maybe_sub_type));
+        if type_path.qself.is_none() {
+            if let Some(segment) = first_and_only(type_path.path.segments.iter()) {
+                if let Ok(special) = Special::from_str(segment.ident.to_string().as_ref()) {
+                    let maybe_sub_type =
+                        Special::create_maybe_sub_type(&segment.arguments, span_range);
+                    return Some((special, maybe_sub_type));
+                }
             }
         }
         None
@@ -232,6 +233,19 @@ impl Special {
                 abort!(span_range, "Expected <..> generic parameter.")
             }
         }
+    }
+
+    // Utility that turns camel case into snake case.
+    // For example, "AnyString" -> "any_string".
+    fn to_snake_case(&self) -> String {
+        let mut snake_case_string = String::new();
+        for (index, ch) in self.to_string().chars().enumerate() {
+            if index > 0 && ch.is_uppercase() {
+                snake_case_string.push('_');
+            }
+            snake_case_string.push(ch.to_ascii_lowercase());
+        }
+        snake_case_string
     }
 }
 
@@ -320,17 +334,6 @@ struct DeltaPatType<'a> {
     last_special: Option<Special>,
 }
 
-fn camel_case_to_snake_case(s: &str) -> String {
-    let mut result = String::new();
-    for (index, c) in s.chars().enumerate() {
-        if index > 0 && c.is_uppercase() {
-            result.push('_');
-        }
-        result.push(c.to_ascii_lowercase());
-    }
-    result
-}
-
 impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path_old: TypePath) -> TypePath {
         // Apply "fold" recursively to process specials in subtypes, for example, Vec<AnyString>.
@@ -381,27 +384,22 @@ impl<'a> DeltaPatType<'a> {
 
     // Create a new generic type, for example, "AnyString3"
     fn create_generic(&mut self, special: &Special) -> TypePath {
-        let suffix = self
-            .suffix_iter
-            .next()
-            .expect("Internal error: ran out of generic suffixes");
+        let suffix = self.create_suffix();
         let generic_name = format!("{}{}", &special, suffix);
-        // cmk use syn's parse_ident(?)?
-
         parse_str(&generic_name).expect("Internal error: failed to parse generic name")
     }
 
     // Create a new lifetime, for example, "'any_nd_array_4"
     fn create_lifetime(&mut self, special: &Special) -> Lifetime {
-        let suffix = &self
-            .suffix_iter
+        let lifetime_name = format!("'{}{}", special.to_snake_case(), self.create_suffix());
+        parse_str(&lifetime_name).expect("Internal error: failed to parse lifetime name")
+    }
+
+    // Create a new suffix, for example, "4"
+    fn create_suffix(&mut self) -> String {
+        self.suffix_iter
             .next()
-            .expect("Internal error: ran out of generic suffixes");
-        let snake_case = camel_case_to_snake_case(&format!("{}", &special));
-        let lifetime_name = format!("'{}{}", snake_case, suffix,);
-        let lifetime: Lifetime =
-            parse_str(&lifetime_name).expect("Internal error: failed to parse lifetime name");
-        lifetime
+            .expect("Internal error: ran out of generic suffixes")
     }
 }
 
