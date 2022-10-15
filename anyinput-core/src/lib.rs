@@ -2,13 +2,12 @@
 
 mod tests;
 
-use proc_macro2::{Span, TokenStream};
-use proc_macro_error::abort;
+use proc_macro2::TokenStream;
+use proc_macro_error::{abort, SpanRange};
 use quote::quote;
 use std::str::FromStr;
-use strum::EnumString;
+use strum::{Display, EnumString};
 use syn::fold::Fold;
-use syn::spanned::Spanned;
 use syn::Ident;
 use syn::{
     parse2, parse_quote, parse_str, punctuated::Punctuated, token::Comma, Block, FnArg,
@@ -96,7 +95,7 @@ fn simple_suffix_iter_factory() -> impl Iterator<Item = String> + 'static {
 }
 
 // Define the Specials and their properties.
-#[derive(Debug, Clone, EnumString)]
+#[derive(Debug, Clone, EnumString, Display)]
 #[allow(clippy::enum_variant_names)]
 enum Special {
     AnyArray,
@@ -112,7 +111,7 @@ impl Special {
         generic: &TypePath, // for example: AnyArray0
         maybe_sub_type: Option<Type>,
         maybe_lifetime: Option<Lifetime>,
-        span: &Span,
+        span: &SpanRange,
     ) -> GenericParam {
         match &self {
             Special::AnyString => {
@@ -302,12 +301,13 @@ fn camel_case_to_snake_case(s: &str) -> String {
 impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path_old: TypePath) -> TypePath {
         // Apply "fold" recursively to process specials in subtypes, for example, Vec<AnyString>.
-        let type_path_middle = syn::fold::fold_type_path(self, type_path_old.clone());
+        let type_path_middle = syn::fold::fold_type_path(self, type_path_old);
 
         // If this type is special, replace it with a generic.
         if let Some((special, args)) = create_maybe_special(&type_path_middle) {
             self.last_special = Some(special.clone()); // remember the special found (used for stmt generation)
-            self.create_and_define_generic(special, args, &type_path_old.span())
+            let span_range = SpanRange::from_tokens(&type_path_middle);
+            self.create_and_define_generic(special, args, &span_range)
         } else {
             self.last_special = None;
             type_path_middle
@@ -321,13 +321,13 @@ impl<'a> DeltaPatType<'a> {
         &mut self,
         special: Special,
         args: PathArguments,
-        span: &Span,
+        span_range: &SpanRange,
     ) -> TypePath {
         let generic = self.create_generic(&special); // for example, "AnyString3"
-        let maybe_sub_type = create_maybe_sub_type(args, span);
+        let maybe_sub_type = create_maybe_sub_type(args, span_range);
         let maybe_lifetime = self.create_maybe_lifetime(&special);
         let generic_param =
-            special.special_to_generic_param(&generic, maybe_sub_type, maybe_lifetime, span);
+            special.special_to_generic_param(&generic, maybe_sub_type, maybe_lifetime, span_range);
         self.generic_params.push(generic_param);
         generic
     }
@@ -351,7 +351,7 @@ impl<'a> DeltaPatType<'a> {
             .suffix_iter
             .next()
             .expect("Internal error: ran out of generic suffixes");
-        let generic_name = format!("{:?}{}", &special, suffix);
+        let generic_name = format!("{}{}", &special, suffix);
         // cmk implement display and remove "?"
         // cmk use syn's parse_ident(?)?
 
@@ -373,21 +373,22 @@ impl<'a> DeltaPatType<'a> {
     }
 }
 
-fn create_maybe_sub_type(args: PathArguments, span: &Span) -> Option<Type> {
+fn create_maybe_sub_type(args: PathArguments, span_range: &SpanRange) -> Option<Type> {
     match args {
         PathArguments::None => None,
         PathArguments::AngleBracketed(ref args) => {
-            let arg = first_and_only(args.args.iter())
-                .unwrap_or_else(|| abort!(span, "Expected at exactly one generic parameter."));
+            let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
+                abort!(span_range, "Expected at exactly one generic parameter.")
+            });
             // println!("arg: {}", quote!(#arg));
             if let GenericArgument::Type(sub_type2) = arg {
                 Some(sub_type2.clone())
             } else {
-                abort!(span, "Expected generic parameter to be a type.")
+                abort!(span_range, "Expected generic parameter to be a type.")
             }
         }
         PathArguments::Parenthesized(_) => {
-            abort!(span, "Expected <..> generic parameter.")
+            abort!(span_range, "Expected <..> generic parameter.")
         }
     }
 }
