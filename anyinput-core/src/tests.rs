@@ -760,6 +760,7 @@ struct StmtCounter {
 impl Fold for StmtCounter {
     fn fold_stmt(&mut self, stmt_old: Stmt) -> Stmt {
         let stmt_middle = syn::fold::fold_stmt(self, stmt_old);
+
         println!("stmt #{}: {}", self.count, quote!(#stmt_middle));
         self.count += 1;
 

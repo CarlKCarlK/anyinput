@@ -1,8 +1,6 @@
 #![doc = include_str!("../README.md")]
 
 mod tests;
-// todo use AST spans test so that problems with the user's syntax are reported correctly
-//           see quote_spanned! in https://github.com/dtolnay/syn/blob/master/examples/heapsize/heapsize_derive/src/lib.rs
 
 use proc_macro2::TokenStream;
 use proc_macro_error::abort;
@@ -16,8 +14,6 @@ use syn::{
     GenericArgument, GenericParam, Generics, ItemFn, Lifetime, Pat, PatIdent, PatType,
     PathArguments, PathSegment, Signature, Stmt, Type, TypePath,
 };
-
-// todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 
 pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
     if !args.is_empty() {
@@ -38,47 +34,67 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
 fn transform_fn(old_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
 
-    // start with 1. no function arguments, 2. the old function's generics, 3. the old function's statements
+    // Start with 1. no function arguments, 2. the old function's generics, 3. the old function's statements
     let init = DeltaFnArgList {
         fn_args: Punctuated::<FnArg, Comma>::new(),
         generic_params: old_fn.sig.generics.params.clone(),
         stmts: old_fn.block.stmts,
     };
 
-    // Transform each old argument of the function, accumulating the new argument, new generic definitions and new statements
-    let delta_fun_args = (old_fn.sig.inputs)
+    // Transform each old argument of the function, accumulating: the new argument, new generic definitions and new statements
+    let delta_fun_arg_list = (old_fn.sig.inputs)
         .iter()
         .map(|old_fn_arg| transform_fn_arg(old_fn_arg, &mut suffix_iter))
-        .fold(init, |mut delta_fun_args, delta_fun_arg| {
-            delta_fun_args.merge(delta_fun_arg);
-            delta_fun_args
+        .fold(init, |mut delta_fun_arg_list, delta_fun_arg| {
+            delta_fun_arg_list.merge(delta_fun_arg);
+            delta_fun_arg_list
         });
 
     // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
     // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
-    // // todo Is this the best way to create a new function from an old one?
     ItemFn {
         sig: Signature {
             generics: Generics {
                 lt_token: parse_quote!(<),
-                params: delta_fun_args.generic_params,
+                params: delta_fun_arg_list.generic_params,
                 gt_token: parse_quote!(>),
                 ..old_fn.sig.generics.clone()
             },
-            inputs: delta_fun_args.fn_args,
+            inputs: delta_fun_arg_list.fn_args,
             ..old_fn.sig.clone()
         },
         block: Box::new(Block {
-            stmts: delta_fun_args.stmts,
+            stmts: delta_fun_arg_list.stmts,
             ..*old_fn.block
         }),
         ..old_fn
     }
 }
 
+struct DeltaFnArgList {
+    fn_args: Punctuated<FnArg, Comma>,
+    generic_params: Punctuated<GenericParam, Comma>,
+    stmts: Vec<Stmt>,
+}
+
+impl DeltaFnArgList {
+    fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
+        self.fn_args.push(delta_fn_arg.fn_arg);
+        self.generic_params.extend(delta_fn_arg.generic_params);
+        for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
+            self.stmts.insert(index, stmt);
+        }
+    }
+}
+
+// Define a generator for suffixes of generic types. "0", "1", "2", ...
+// This is used to create unique names for generic types.
+// Could switch to one based on UUIDs, but this is easier to read.
 fn simple_suffix_iter_factory() -> impl Iterator<Item = String> + 'static {
     (0usize..).into_iter().map(|i| format!("{i}"))
 }
+
+// Define the Specials and their properties.
 #[derive(Debug, Clone, EnumString)]
 #[allow(clippy::enum_variant_names)]
 enum Special {
@@ -89,16 +105,7 @@ enum Special {
     AnyNdArray,
 }
 
-// todo later do something interesting with 2d ndarray/views
-
 impl Special {
-    fn should_add_lifetime(&self) -> bool {
-        match self {
-            Special::AnyArray | Special::AnyString | Special::AnyPath | Special::AnyIter => false,
-            Special::AnyNdArray => true,
-        }
-    }
-
     fn special_to_generic_param(
         &self,
         old_type: &TypePath,
@@ -174,41 +181,16 @@ impl Special {
             }
         }
     }
-}
 
-fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
-    let first = iter.next()?;
-    if iter.next().is_some() {
-        None
-    } else {
-        Some(first)
-    }
-}
-
-struct DeltaFnArgList {
-    fn_args: Punctuated<FnArg, Comma>,
-    generic_params: Punctuated<GenericParam, Comma>,
-    stmts: Vec<Stmt>,
-}
-
-impl DeltaFnArgList {
-    fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
-        self.fn_args.push(delta_fn_arg.fn_arg);
-        self.generic_params.extend(delta_fn_arg.generic_params);
-        for (index, stmt) in delta_fn_arg.stmts.into_iter().enumerate() {
-            self.stmts.insert(index, stmt);
+    fn should_add_lifetime(&self) -> bool {
+        match self {
+            Special::AnyArray | Special::AnyString | Special::AnyPath | Special::AnyIter => false,
+            Special::AnyNdArray => true,
         }
     }
 }
 
-#[derive(Debug)]
-// the new function input, any statements to add, and any new generic definitions.
-struct DeltaFnArg {
-    fn_arg: FnArg,
-    generic_params: Vec<GenericParam>,
-    stmts: Vec<Stmt>,
-}
-
+// If a function argument contains a special type(s), re-write it.
 fn transform_fn_arg(
     old_fn_arg: &FnArg,
     suffix_iter: &mut impl Iterator<Item = String>,
@@ -234,8 +216,19 @@ fn transform_fn_arg(
     }
 }
 
+#[derive(Debug)]
+// The new function input, any statements to add, and any new generic definitions.
+struct DeltaFnArg {
+    fn_arg: FnArg,
+    generic_params: Vec<GenericParam>,
+    stmts: Vec<Stmt>,
+}
+
 impl DeltaPatType<'_> {
     fn generate_any_stmts(&self, pat_ident: &PatIdent) -> Vec<Stmt> {
+        // If the top-level type is a special, add a statement to convert
+        // from its generic type to to a concrete type.
+        // For example,  "let x = x.into_iter();" for AnyIter.
         if let Some(special) = &self.last_special {
             vec![special.ident_to_stmt(&pat_ident.ident)]
         } else {
@@ -384,3 +377,15 @@ fn is_special_type_path(type_path: &TypePath) -> Option<(PathSegment, Special)> 
         None
     }
 }
+// Utility that tells if an iterator contains exactly one element.
+fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
+    let first = iter.next()?;
+    if iter.next().is_some() {
+        None
+    } else {
+        Some(first)
+    }
+}
+
+// todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
+// todo later do something interesting with 2d ndarray/views
