@@ -39,7 +39,7 @@ fn transform_fn(old_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
 
     // start with 1. no function arguments, 2. the old function's generics, 3. the old function's statements
-    let init = DeltaFnArgs {
+    let init = DeltaFnArgList {
         fn_args: Punctuated::<FnArg, Comma>::new(),
         generic_params: old_fn.sig.generics.params.clone(),
         stmts: old_fn.block.stmts,
@@ -185,13 +185,13 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
     }
 }
 
-struct DeltaFnArgs {
+struct DeltaFnArgList {
     fn_args: Punctuated<FnArg, Comma>,
     generic_params: Punctuated<GenericParam, Comma>,
     stmts: Vec<Stmt>,
 }
 
-impl DeltaFnArgs {
+impl DeltaFnArgList {
     fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
         self.fn_args.push(delta_fn_arg.fn_arg);
         self.generic_params.extend(delta_fn_arg.generic_params);
@@ -213,7 +213,6 @@ fn transform_fn_arg(
     old_fn_arg: &FnArg,
     suffix_iter: &mut impl Iterator<Item = String>,
 ) -> DeltaFnArg {
-    // cmk0 is this the beast way to find "normal"?
     // If the function input is normal (not self, not a macro, etc) ...
     if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
         // Replace any specials in the type with generics.
@@ -257,16 +256,15 @@ fn is_normal_fn_arg(fn_arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
     None
 }
 
+// Search type and its (sub)subtypes for specials starting at the deepest level.
+// When one is found, replace it with a generic.
+// Finally, return the new type and a list of the generic definitions.
+// Also, if the top-level type was special, return the special type.
 #[allow(clippy::ptr_arg)]
 fn replace_any_specials(
     old_pat_type: PatType,
     suffix_iter: &mut impl Iterator<Item = String>,
 ) -> (DeltaPatType, PatType) {
-    // Search type and its (sub)subtypes for specials starting at the deepest level.
-    // When one is found, replace it with a generic.
-    // Finally, return the new type and a list of the generic definitions.
-    // Also, if the top-level type was special, return the special type.
-
     let mut delta_pat_type = DeltaPatType {
         generic_params: vec![],
         suffix_iter,
@@ -295,19 +293,15 @@ fn camel_case_to_snake_case(s: &str) -> String {
 }
 
 impl Fold for DeltaPatType<'_> {
-    // cmk don't like the names _original and NULL
-    fn fold_type_path(&mut self, type_path_original: TypePath) -> TypePath {
-        println!(
-            "fold_type_path (before) code: {}",
-            quote!(#type_path_original)
-        );
-        println!("                      syntax: {:?}", type_path_original);
+    fn fold_type_path(&mut self, type_path_old: TypePath) -> TypePath {
+        println!("fold_type_path (before) code: {}", quote!(#type_path_old));
+        println!("                      syntax: {:?}", type_path_old);
 
         // Search for any special (sub)subtypes, replacing them with generics.
-        let mut type_path = syn::fold::fold_type_path(self, type_path_original.clone());
+        let type_path_middle = syn::fold::fold_type_path(self, type_path_old.clone());
 
         // If this top-level type is special, replace it with a generic.
-        if let Some((segment, special)) = is_special_type_path(&type_path) {
+        if let Some((segment, special)) = is_special_type_path(&type_path_middle) {
             self.last_special = Some(special.clone()); // remember which kind of special found
 
             let suffix = self
@@ -315,11 +309,11 @@ impl Fold for DeltaPatType<'_> {
                 .next()
                 .expect("Internal error: ran out of generic suffixes");
             let generic_name = format!("{:?}{}", &special, suffix); // todo implement display and remove "?"
-            type_path =
+            let type_path_new =
                 parse_str(&generic_name).expect("Internal error: failed to parse generic name");
 
             // Define the generic type, e.g. S23: AsRef<str>, and remember it.
-            let sub_type = has_sub_type(&type_path_original, segment.arguments); // Find anything inside angle brackets.
+            let sub_type = has_sub_type(&type_path_old, segment.arguments); // Find anything inside angle brackets.
 
             let maybe_lifetime = if special.should_add_lifetime() {
                 let suffix = &self
@@ -339,18 +333,21 @@ impl Fold for DeltaPatType<'_> {
             };
 
             let generic_param = special.special_to_generic_param(
-                &type_path_original,
-                &type_path,
+                &type_path_old,
+                &type_path_new,
                 sub_type.as_ref(),
                 maybe_lifetime,
             );
             self.generic_params.push(generic_param);
+            println!("fold_type_path (after) code: {}", quote!(#type_path_new));
+            println!("                      syntax: {:?}", type_path_new);
+            type_path_new
         } else {
             self.last_special = None;
+            println!("fold_type_path (after) code: {}", quote!(#type_path_middle));
+            println!("                      syntax: {:?}", type_path_middle);
+            type_path_middle
         }
-        println!("fold_type_path (after) code: {}", quote!(#type_path));
-        println!("                      syntax: {:?}", type_path);
-        type_path
     }
 }
 
