@@ -716,7 +716,12 @@ fn conversion_combinations() {
             println!("hello world")
         }
     );
-    let _string_of_code1: String = tokens1.to_string();
+    let string_of_code = stringify!(
+        fn hello() {
+            println!("hello world")
+        }
+    );
+    println!("{}", string_of_code);
     let string_from_code_and_tokens: String =
         format!("Code: {0}\nTokens: {0:?}\nPretty Tokens: {0:#?}", tokens1);
     println!("{}", string_from_code_and_tokens);
