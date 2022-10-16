@@ -37,41 +37,39 @@ fn transform_fn(item_fn: ItemFn) -> ItemFn {
 
     // Transform each old argument of the function, accumulating: the new argument, new generics, wheres, and statements
     // Then, turn the accumulation into a new function.
-
-    (item_fn.sig.inputs.clone())
+    item_fn
+        .sig
+        .inputs
         .iter()
         .map(delta_fn_arg_new)
-        .fold(ItemFnAcc::init(item_fn), ItemFnAcc::fold)
+        .fold(ItemFnAcc::init(&item_fn), ItemFnAcc::fold)
         .to_item_fn()
 }
 
-struct ItemFnAcc {
-    old_fn: ItemFn,
+struct ItemFnAcc<'a> {
+    old_fn: &'a ItemFn,
     fn_args: Punctuated<FnArg, Comma>,
     generic_params: Punctuated<GenericParam, Comma>,
     where_predicates: Punctuated<WherePredicate, Comma>,
     stmts: Vec<Stmt>,
 }
 
-impl ItemFnAcc {
-    fn init(item_fn: ItemFn) -> ItemFnAcc {
+impl ItemFnAcc<'_> {
+    fn init(item_fn: &ItemFn) -> ItemFnAcc {
         // Start with 1. no function arguments, 2. the old function's generics, wheres, and statements
-        let where_predicates = ItemFnAcc::extract_where_predicates(&item_fn);
-        let stmts = item_fn.block.stmts.clone();
-        let generic_params = item_fn.sig.generics.params.clone();
         ItemFnAcc {
             old_fn: item_fn,
             fn_args: Punctuated::<FnArg, Comma>::new(),
-            generic_params,
-            where_predicates,
-            stmts,
+            generic_params: item_fn.sig.generics.params.clone(),
+            where_predicates: ItemFnAcc::extract_where_predicates(item_fn),
+            stmts: item_fn.block.stmts.clone(),
         }
     }
 
     // Even if the where clause is None, we still need to return an empty Punctuated
-    fn extract_where_predicates(old_fn: &ItemFn) -> Punctuated<WherePredicate, Comma> {
-        if let Some(WhereClause { predicates, .. }) = old_fn.sig.generics.where_clause.clone() {
-            predicates
+    fn extract_where_predicates(item_fn: &ItemFn) -> Punctuated<WherePredicate, Comma> {
+        if let Some(WhereClause { predicates, .. }) = &item_fn.sig.generics.where_clause {
+            predicates.clone()
         } else {
             parse_quote!()
         }
@@ -81,8 +79,8 @@ impl ItemFnAcc {
         self.fn_args.push(delta.fn_arg);
         self.generic_params.extend(delta.generic_params);
         self.where_predicates.extend(delta.where_predicates);
-        for (index, stmt) in delta.stmt.into_iter().enumerate() {
-            self.stmts.insert(index, stmt);
+        for (index, element) in delta.stmt.into_iter().enumerate() {
+            self.stmts.insert(index, element);
         }
         self
     }
@@ -99,7 +97,7 @@ impl ItemFnAcc {
                 stmts: self.stmts.clone(),
                 ..*self.old_fn.block.clone()
             }),
-            ..self.old_fn.clone() // cmk seems like a lot of clones
+            ..self.old_fn.clone()
         }
     }
 

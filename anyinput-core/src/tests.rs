@@ -69,30 +69,37 @@ fn two_inputs() -> anyhow::Result<()> {
         }
     };
     let expected = quote! {
-        pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str> >(
-            a: AnyString0,
-            b: AnyString1
-        ) -> Result<usize, anyhow::Error> {
-            let b = b.as_ref();
-            let a = a.as_ref();
-            let len = a.len() + b.len();
-            Ok(len)
-        }
-    };
-
-    let after = anyinput_core(quote!(), before);
-    assert_tokens_eq(&expected, &after);
-
-    pub fn any_str_len<AnyString0: AsRef<str>, AnyString1: AsRef<str>>(
+    pub fn any_str_len<AnyString0, AnyString1>(
         a: AnyString0,
-        b: AnyString1,
-    ) -> Result<usize, anyhow::Error> {
+        b: AnyString1
+    ) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>,
+        AnyString1: AsRef<str>
+    {
         let b = b.as_ref();
         let a = a.as_ref();
         let len = a.len() + b.len();
         Ok(len)
     }
+    };
 
+    let after = anyinput_core(quote!(), before);
+    assert_tokens_eq(&expected, &after);
+
+    pub fn any_str_len<AnyString0, AnyString1>(
+        a: AnyString0,
+        b: AnyString1,
+    ) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>,
+        AnyString1: AsRef<str>,
+    {
+        let b = b.as_ref();
+        let a = a.as_ref();
+        let len = a.len() + b.len();
+        Ok(len)
+    }
     let s = "1234".to_string();
     assert_eq!(any_str_len("abc", s)?, 7);
     Ok(())
@@ -124,25 +131,31 @@ fn one_plus_two_input() -> anyhow::Result<()> {
         }
     };
     let expected = quote! {
-        pub fn any_str_len_plus2<AnyString0: AsRef<str> >(
-            a: usize,
-            s: AnyString0,
-            b: usize
-        ) -> Result<usize, anyhow::Error> {
-            let s = s.as_ref();
-            let len = s.len() + a + b;
-            Ok(len)
-        }
+    pub fn any_str_len_plus2<AnyString0>(
+        a: usize,
+        s: AnyString0,
+        b: usize
+    ) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>
+    {
+        let s = s.as_ref();
+        let len = s.len() + a + b;
+        Ok(len)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_str_len_plus2<AnyString0: AsRef<str>>(
+    pub fn any_str_len_plus2<AnyString0>(
         a: usize,
         s: AnyString0,
         b: usize,
-    ) -> Result<usize, anyhow::Error> {
+    ) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>,
+    {
         let s = s.as_ref();
         let len = s.len() + a + b;
         Ok(len)
@@ -159,22 +172,25 @@ fn one_path_input() {
         Ok(count)
     }
       };
+
     let expected = quote! {
-        pub fn any_count_path<AnyPath0: AsRef<std::path::Path> >(
-            p: AnyPath0
-        ) -> Result<usize, anyhow::Error> {
-            let p = p.as_ref();
-            let count = p.iter().count();
-            Ok(count)
-        }
+    pub fn any_count_path<AnyPath0>(p: AnyPath0) -> Result<usize, anyhow::Error>
+    where
+        AnyPath0: AsRef<std::path::Path>
+    {
+        let p = p.as_ref();
+        let count = p.iter().count();
+        Ok(count)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_count_path<AnyPath0: AsRef<std::path::Path>>(
-        p: AnyPath0,
-    ) -> Result<usize, anyhow::Error> {
+    pub fn any_count_path<AnyPath0>(p: AnyPath0) -> Result<usize, anyhow::Error>
+    where
+        AnyPath0: AsRef<std::path::Path>,
+    {
         let p = p.as_ref();
         let count = p.iter().count();
         Ok(count)
@@ -191,22 +207,24 @@ fn one_iter_usize_input() {
         }
     };
     let expected = quote! {
-        pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize> >(
-            i: AnyIter0
-        ) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
-            let count = i.count();
-            Ok(count)
-        }
+    pub fn any_count_iter<AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        AnyIter0: IntoIterator<Item = usize>
+    {
+        let i = i.into_iter();
+        let count = i.count();
+        Ok(count)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_count_iter<AnyIter0: IntoIterator<Item = usize>>(
-        i: AnyIter0,
-    ) -> Result<usize, anyhow::Error> {
-        let i: <AnyIter0 as IntoIterator>::IntoIter = i.into_iter();
+    pub fn any_count_iter<AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        AnyIter0: IntoIterator<Item = usize>,
+    {
+        let i = i.into_iter();
         let count = i.count();
         Ok(count)
     }
@@ -222,21 +240,23 @@ fn one_iter_i32() {
     }
         };
     let expected = quote! {
-        pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32> >(
-            i: AnyIter0
-        ) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
-            let count = i.count();
-            Ok(count)
-        }
+    pub fn any_count_iter<AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        AnyIter0: IntoIterator<Item = i32>
+    {
+        let i = i.into_iter();
+        let count = i.count();
+        Ok(count)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_count_iter<AnyIter0: IntoIterator<Item = i32>>(
-        i: AnyIter0,
-    ) -> Result<usize, anyhow::Error> {
+    pub fn any_count_iter<AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        AnyIter0: IntoIterator<Item = i32>,
+    {
         let i = i.into_iter();
         let count = i.count();
         Ok(count)
@@ -253,21 +273,23 @@ fn one_iter_t() {
     }
        };
     let expected = quote! {
-        pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T> >(
-            i: AnyIter0
-        ) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
-            let count = i.count();
-            Ok(count)
-        }
+    pub fn any_count_iter<T, AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        AnyIter0: IntoIterator<Item = T>
+    {
+        let i = i.into_iter();
+        let count = i.count();
+        Ok(count)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_count_iter<T, AnyIter0: IntoIterator<Item = T>>(
-        i: AnyIter0,
-    ) -> Result<usize, anyhow::Error> {
+    pub fn any_count_iter<T, AnyIter0>(i: AnyIter0) -> Result<usize, anyhow::Error>
+    where
+        AnyIter0: IntoIterator<Item = T>,
+    {
         let i = i.into_iter();
         let count = i.count();
         Ok(count)
@@ -319,27 +341,25 @@ fn one_iter_path() {
     }
        };
     let expected = quote! {
-            pub fn any_count_iter<
-            AnyPath0: AsRef<std::path::Path>,
-            AnyIter1: IntoIterator<Item = AnyPath0>
-        >(
-            i: AnyIter1
-        ) -> Result<usize, anyhow::Error> {
-            let i = i.into_iter();
-            let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
-            Ok(sum_count)
-        }
+    pub fn any_count_iter<AnyPath0, AnyIter1>(i: AnyIter1) -> Result<usize, anyhow::Error>
+    where
+        AnyPath0: AsRef<std::path::Path>,
+        AnyIter1: IntoIterator<Item = AnyPath0>
+    {
+        let i = i.into_iter();
+        let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
+        Ok(sum_count)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_count_iter<
+    pub fn any_count_iter<AnyPath0, AnyIter1>(i: AnyIter1) -> Result<usize, anyhow::Error>
+    where
         AnyPath0: AsRef<std::path::Path>,
         AnyIter1: IntoIterator<Item = AnyPath0>,
-    >(
-        i: AnyIter1,
-    ) -> Result<usize, anyhow::Error> {
+    {
         let i = i.into_iter();
         let sum_count = i.map(|x| x.as_ref().iter().count()).sum();
         Ok(sum_count)
@@ -358,19 +378,22 @@ fn one_vec_path() {
         }
     };
     let expected = quote! {
-    pub fn any_count_vec<AnyPath0: AsRef<std::path::Path> >(
-        i: Vec<AnyPath0>
-    ) -> Result<usize, anyhow::Error> {
-        let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
-        Ok(sum_count)
-    }};
+        pub fn any_count_vec<AnyPath0>(i: Vec<AnyPath0>) -> Result<usize, anyhow::Error>
+        where
+            AnyPath0: AsRef<std::path::Path>
+        {
+            let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
+            Ok(sum_count)
+        }
+    };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_count_vec<AnyPath0: AsRef<std::path::Path>>(
-        i: Vec<AnyPath0>,
-    ) -> Result<usize, anyhow::Error> {
+    pub fn any_count_vec<AnyPath0>(i: Vec<AnyPath0>) -> Result<usize, anyhow::Error>
+    where
+        AnyPath0: AsRef<std::path::Path>,
+    {
         let sum_count = i.iter().map(|x| x.as_ref().iter().count()).sum();
         Ok(sum_count)
     }
@@ -386,19 +409,23 @@ fn one_array_usize_input() {
     }
       };
     let expected = quote! {
-        pub fn any_array_len<AnyArray0: AsRef<[usize]> >(
-            a: AnyArray0
-        ) -> Result<usize, anyhow::Error> {
-            let a = a.as_ref();
-            let len = a.len();
-            Ok(len)
-        }
+    pub fn any_array_len<AnyArray0>(a: AnyArray0) -> Result<usize, anyhow::Error>
+    where
+        AnyArray0: AsRef<[usize]>
+    {
+        let a = a.as_ref();
+        let len = a.len();
+        Ok(len)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_array_len<AnyArray0: AsRef<[usize]>>(a: AnyArray0) -> Result<usize, anyhow::Error> {
+    pub fn any_array_len<AnyArray0>(a: AnyArray0) -> Result<usize, anyhow::Error>
+    where
+        AnyArray0: AsRef<[usize]>,
+    {
         let a = a.as_ref();
         let len = a.len();
         Ok(len)
@@ -428,15 +455,16 @@ fn one_ndarray_usize_input() {
         Ok(len)
     }        };
     let expected = quote! {
-            pub fn any_array_len<
-            'any_nd_array1,
-            AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize> > >(
-            a: AnyNdArray0
-        ) -> Result<usize, anyhow::Error> {
-            let a = a.into();
-            let len = a.len();
-            Ok(len)
-        }
+    pub fn any_array_len<'any_nd_array1, AnyNdArray0>(
+        a: AnyNdArray0
+    ) -> Result<usize, anyhow::Error>
+    where
+        AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize> >
+    {
+        let a = a.into();
+        let len = a.len();
+        Ok(len)
+    }
     };
 
     let after = anyinput_core(quote!(), before);
@@ -445,12 +473,12 @@ fn one_ndarray_usize_input() {
     // The lines are long enough that Clippy would like a comma after
     // a:AnyNdArray0, but the macro doesn't do that because
     // it doesn't know the line length.
-    pub fn any_array_len<
-        'any_nd_array1,
-        AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>,
-    >(
+    pub fn any_array_len<'any_nd_array1, AnyNdArray0>(
         a: AnyNdArray0,
-    ) -> Result<usize, anyhow::Error> {
+    ) -> Result<usize, anyhow::Error>
+    where
+        AnyNdArray0: Into<ndarray::ArrayView1<'any_nd_array1, usize>>,
+    {
         let a = a.into();
         let len = a.len();
         Ok(len)
@@ -481,16 +509,17 @@ fn complex() {
             }
     };
     let expected = quote! {
-        pub fn complex_total<
-        'any_nd_array4,
-        AnyPath0: AsRef<std::path::Path>,
-        AnyArray1: AsRef<[AnyPath0]>,
-        AnyIter2: IntoIterator<Item = Vec<AnyArray1> >,
-        AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize > > >(
+    pub fn complex_total<'any_nd_array4, AnyPath0, AnyArray1, AnyIter2, AnyNdArray3>(
         a: usize,
         b: AnyIter2,
         c: AnyNdArray3
-    ) -> Result<usize, anyhow::Error> {
+    ) -> Result<usize, anyhow::Error>
+    where
+        AnyPath0: AsRef<std::path::Path>,
+        AnyArray1: AsRef<[AnyPath0]>,
+        AnyIter2: IntoIterator<Item = Vec<AnyArray1> >,
+        AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize> >
+    {
         let c = c.into();
         let b = b.into_iter();
         let mut total = a + c.sum();
@@ -510,17 +539,17 @@ fn complex() {
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn complex_total<
-        'any_nd_array4,
+    pub fn complex_total<'any_nd_array4, AnyPath0, AnyArray1, AnyIter2, AnyNdArray3>(
+        a: usize,
+        b: AnyIter2,
+        c: AnyNdArray3,
+    ) -> Result<usize, anyhow::Error>
+    where
         AnyPath0: AsRef<std::path::Path>,
         AnyArray1: AsRef<[AnyPath0]>,
         AnyIter2: IntoIterator<Item = Vec<AnyArray1>>,
         AnyNdArray3: Into<ndarray::ArrayView1<'any_nd_array4, usize>>,
-    >(
-        a: usize,
-        b: AnyIter2,
-        c: AnyNdArray3,
-    ) -> Result<usize, anyhow::Error> {
+    {
         let c = c.into();
         let b = b.into_iter();
         let mut total = a + c.sum();
@@ -551,18 +580,23 @@ fn doc_write() -> Result<(), anyhow::Error> {
     let after = anyinput_core(quote!(), before);
     println!("after: {}", quote! { #after});
     let expected = quote! {
-        fn len_plus_2<AnyString0: AsRef<str> >(s: AnyString0) -> Result<usize, anyhow::Error> {
-            let s = s.as_ref();
-            Ok(s.len() + 2)
-        }
-    };
-    assert_tokens_eq(&expected, &after);
-
-    fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+    fn len_plus_2<AnyString0>(s: AnyString0) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>
+    {
         let s = s.as_ref();
         Ok(s.len() + 2)
     }
+    };
+    assert_tokens_eq(&expected, &after);
 
+    fn len_plus_2<AnyString0>(s: AnyString0) -> Result<usize, anyhow::Error>
+    where
+        AnyString0: AsRef<str>,
+    {
+        let s = s.as_ref();
+        Ok(s.len() + 2)
+    }
     assert_eq!(len_plus_2("hello")?, 7);
 
     Ok(())
