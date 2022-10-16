@@ -31,19 +31,19 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
     quote!(#new_item_fn)
 }
 
-fn transform_fn(old_fn: ItemFn) -> ItemFn {
+fn transform_fn(item_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
 
     // Transform each old argument of the function, accumulating: the new argument, new generics, wheres, and statements
-    // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
-    (old_fn.sig.inputs.clone())
+    // Then, turn the accumulation into a new function.
+    (item_fn.sig.inputs.clone())
         .iter()
         .map(|fn_arg| DeltaFnArg::new(fn_arg, &mut suffix_iter))
-        .fold(FnArgList::init(old_fn), |acc, delta| acc.fold(delta))
+        .fold(ItemFnAcc::init(item_fn), ItemFnAcc::fold)
         .to_item_fn()
 }
 
-struct FnArgList {
+struct ItemFnAcc {
     old_fn: ItemFn,
     fn_args: Punctuated<FnArg, Comma>,
     generic_params: Punctuated<GenericParam, Comma>,
@@ -51,14 +51,14 @@ struct FnArgList {
     stmts: Vec<Stmt>,
 }
 
-impl FnArgList {
-    fn init(old_fn: ItemFn) -> FnArgList {
+impl ItemFnAcc {
+    fn init(item_fn: ItemFn) -> ItemFnAcc {
         // Start with 1. no function arguments, 2. the old function's generics, wheres, and statements
-        let where_predicates = FnArgList::extract_where_predicates(&old_fn);
-        let stmts = old_fn.block.stmts.clone();
-        let generic_params = old_fn.sig.generics.params.clone();
-        FnArgList {
-            old_fn,
+        let where_predicates = ItemFnAcc::extract_where_predicates(&item_fn);
+        let stmts = item_fn.block.stmts.clone();
+        let generic_params = item_fn.sig.generics.params.clone();
+        ItemFnAcc {
+            old_fn: item_fn,
             fn_args: Punctuated::<FnArg, Comma>::new(),
             generic_params,
             where_predicates,
@@ -75,11 +75,11 @@ impl FnArgList {
         }
     }
 
-    fn fold(mut self, delta_fn_arg: DeltaFnArg) -> Self {
-        self.fn_args.push(delta_fn_arg.fn_arg);
-        self.generic_params.extend(delta_fn_arg.generic_params);
-        self.where_predicates.extend(delta_fn_arg.where_predicates);
-        for (index, stmt) in delta_fn_arg.stmt.into_iter().enumerate() {
+    fn fold(mut self, delta: DeltaFnArg) -> Self {
+        self.fn_args.push(delta.fn_arg);
+        self.generic_params.extend(delta.generic_params);
+        self.where_predicates.extend(delta.where_predicates);
+        for (index, stmt) in delta.stmt.into_iter().enumerate() {
             self.stmts.insert(index, stmt);
         }
         self
