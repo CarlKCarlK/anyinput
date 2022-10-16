@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{anyinput_core, simple_suffix_iter_factory, DeltaPatType};
+use crate::anyinput_core;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn, Stmt};
@@ -375,25 +375,6 @@ fn one_vec_path() {
         Ok(sum_count)
     }
     assert_eq!(any_count_vec(vec!["a/b", "d"]).unwrap(), 3);
-}
-
-#[test]
-fn fold_one_path() {
-    let before = parse_quote! {AnyIter<AnyPath> };
-    println!("before: {}", quote!(before));
-    let mut gen = simple_suffix_iter_factory();
-    let mut struct1 = DeltaPatType {
-        generic_params: vec![],
-        where_predicates: vec![],
-        suffix_iter: &mut gen,
-        last_special: None,
-    };
-    let result = struct1.fold_type(before);
-    for generic_param in struct1.generic_params {
-        println!("generic_param: {}", quote!(#generic_param));
-    }
-
-    println!("result: {}", quote!(#result));
 }
 
 #[test]

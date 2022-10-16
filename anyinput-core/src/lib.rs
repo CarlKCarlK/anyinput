@@ -392,10 +392,10 @@ impl<'a> DeltaPatType<'a> {
         }
     }
 
+    // If the top-level type is a special, add a statement to convert
+    // from its generic type to to a concrete type.
+    // For example,  "let x = x.into_iter();" for AnyIter.
     fn generate_any_stmt(&self, pat_ident: &PatIdent) -> Option<Stmt> {
-        // If the top-level type is a special, add a statement to convert
-        // from its generic type to to a concrete type.
-        // For example,  "let x = x.into_iter();" for AnyIter.
         if let Some(special) = &self.last_special {
             let stmt = special.ident_to_stmt(&pat_ident.ident);
             Some(stmt)
