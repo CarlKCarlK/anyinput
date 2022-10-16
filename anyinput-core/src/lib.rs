@@ -33,12 +33,14 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
 
 fn transform_fn(item_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
+    let delta_fn_arg_new = |fn_arg| DeltaFnArg::new(fn_arg, &mut suffix_iter);
 
     // Transform each old argument of the function, accumulating: the new argument, new generics, wheres, and statements
     // Then, turn the accumulation into a new function.
+
     (item_fn.sig.inputs.clone())
         .iter()
-        .map(|fn_arg| DeltaFnArg::new(fn_arg, &mut suffix_iter))
+        .map(delta_fn_arg_new)
         .fold(ItemFnAcc::init(item_fn), ItemFnAcc::fold)
         .to_item_fn()
 }
