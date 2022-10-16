@@ -34,69 +34,90 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
 fn transform_fn(old_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
 
-    // Start with 1. no function arguments, 2. the old function's generics, 3. the old function's statements
-    // cmk make own function
-    let where_clause =
-        if let Some(WhereClause { predicates, .. }) = old_fn.sig.generics.where_clause.clone() {
-            predicates
-        } else {
-            parse_quote!()
-        };
-    let init = DeltaFnArgList {
-        fn_args: Punctuated::<FnArg, Comma>::new(),
-        generic_params: old_fn.sig.generics.params.clone(),
-        where_predicates: where_clause,
-        stmts: old_fn.block.stmts,
-    };
-
-    // Transform each old argument of the function, accumulating: the new argument, new generic definitions and new statements
-    let delta_fun_arg_list = (old_fn.sig.inputs)
-        .iter()
-        .map(|old_fn_arg| transform_fn_arg(old_fn_arg, &mut suffix_iter))
-        .fold(init, |mut delta_fun_arg_list, delta_fun_arg| {
-            delta_fun_arg_list.merge(delta_fun_arg);
-            delta_fun_arg_list
-        });
-
+    // Transform each old argument of the function, accumulating: the new argument, new generics, wheres, and statements
     // Create a new function with the transformed inputs and accumulated generic definitions, and statements.
-    // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
-    // cmk println!("predicates: {}", quote!(#_predicates));
-    ItemFn {
-        sig: Signature {
-            generics: Generics {
-                lt_token: parse_quote!(<),
-                params: delta_fun_arg_list.generic_params,
-                gt_token: parse_quote!(>),
-                where_clause: Some(WhereClause {
-                    where_token: parse_quote!(where),
-                    predicates: delta_fun_arg_list.where_predicates,
-                }),
-            },
-            inputs: delta_fun_arg_list.fn_args,
-            ..old_fn.sig.clone()
-        },
-        block: Box::new(Block {
-            stmts: delta_fun_arg_list.stmts,
-            ..*old_fn.block
-        }),
-        ..old_fn
-    }
+    (old_fn.sig.inputs.clone())
+        .iter()
+        .map(|fn_arg| DeltaFnArg::new(fn_arg, &mut suffix_iter))
+        .fold(FnArgList::init(old_fn), |acc, delta| acc.fold(delta))
+        .to_item_fn()
 }
 
-struct DeltaFnArgList {
+struct FnArgList {
+    old_fn: ItemFn,
     fn_args: Punctuated<FnArg, Comma>,
     generic_params: Punctuated<GenericParam, Comma>,
     where_predicates: Punctuated<WherePredicate, Comma>,
     stmts: Vec<Stmt>,
 }
 
-impl DeltaFnArgList {
-    fn merge(&mut self, delta_fn_arg: DeltaFnArg) {
+impl FnArgList {
+    fn init(old_fn: ItemFn) -> FnArgList {
+        // Start with 1. no function arguments, 2. the old function's generics, wheres, and statements
+        let where_predicates = FnArgList::extract_where_predicates(&old_fn);
+        let stmts = old_fn.block.stmts.clone();
+        let generic_params = old_fn.sig.generics.params.clone();
+        FnArgList {
+            old_fn,
+            fn_args: Punctuated::<FnArg, Comma>::new(),
+            generic_params,
+            where_predicates,
+            stmts,
+        }
+    }
+
+    // Even if the where clause is None, we still need to return an empty Punctuated
+    fn extract_where_predicates(old_fn: &ItemFn) -> Punctuated<WherePredicate, Comma> {
+        if let Some(WhereClause { predicates, .. }) = old_fn.sig.generics.where_clause.clone() {
+            predicates
+        } else {
+            parse_quote!()
+        }
+    }
+
+    fn fold(mut self, delta_fn_arg: DeltaFnArg) -> Self {
         self.fn_args.push(delta_fn_arg.fn_arg);
         self.generic_params.extend(delta_fn_arg.generic_params);
         self.where_predicates.extend(delta_fn_arg.where_predicates);
         for (index, stmt) in delta_fn_arg.stmt.into_iter().enumerate() {
             self.stmts.insert(index, stmt);
+        }
+        self
+    }
+
+    // Use Rust's struct update syntax (https://www.reddit.com/r/rust/comments/pchp8h/media_struct_update_syntax_in_rust/)
+    fn to_item_fn(&self) -> ItemFn {
+        ItemFn {
+            sig: Signature {
+                generics: self.to_generics(),
+                inputs: self.fn_args.clone(),
+                ..self.old_fn.sig.clone()
+            },
+            block: Box::new(Block {
+                stmts: self.stmts.clone(),
+                ..*self.old_fn.block.clone()
+            }),
+            ..self.old_fn.clone() // cmk seems like a lot of clones
+        }
+    }
+
+    fn to_generics(&self) -> Generics {
+        Generics {
+            lt_token: parse_quote!(<),
+            params: self.generic_params.clone(),
+            gt_token: parse_quote!(>),
+            where_clause: self.to_where_clause(),
+        }
+    }
+
+    fn to_where_clause(&self) -> Option<WhereClause> {
+        if self.where_predicates.is_empty() {
+            None
+        } else {
+            Some(WhereClause {
+                where_token: parse_quote!(where),
+                predicates: self.where_predicates.clone(),
+            })
         }
     }
 }
@@ -273,34 +294,6 @@ impl Special {
     }
 }
 
-// If a function argument contains a special type(s), re-write it.
-fn transform_fn_arg(
-    old_fn_arg: &FnArg,
-    suffix_iter: &mut impl Iterator<Item = String>,
-) -> DeltaFnArg {
-    // If the function input is normal (not self, not a macro, etc) ...
-    if let Some((pat_ident, pat_type)) = is_normal_fn_arg(old_fn_arg) {
-        // Replace any specials in the type with generics.
-        let (delta_pat_type, new_pat_type) = replace_any_specials(pat_type.clone(), suffix_iter);
-
-        // Return the new function input, any statements to add, and any new generic definitions.
-        DeltaFnArg {
-            fn_arg: FnArg::Typed(new_pat_type),
-            stmt: delta_pat_type.generate_any_stmt(pat_ident),
-            generic_params: delta_pat_type.generic_params,
-            where_predicates: delta_pat_type.where_predicates,
-        }
-    } else {
-        // if input is not normal, return it unchanged.
-        DeltaFnArg {
-            fn_arg: old_fn_arg.clone(),
-            generic_params: vec![],
-            where_predicates: vec![],
-            stmt: None,
-        }
-    }
-}
-
 #[derive(Debug)]
 // The new function input, any statements to add, and any new generic definitions.
 struct DeltaFnArg {
@@ -310,51 +303,57 @@ struct DeltaFnArg {
     stmt: Option<Stmt>,
 }
 
-impl DeltaPatType<'_> {
-    fn generate_any_stmt(&self, pat_ident: &PatIdent) -> Option<Stmt> {
-        // If the top-level type is a special, add a statement to convert
-        // from its generic type to to a concrete type.
-        // For example,  "let x = x.into_iter();" for AnyIter.
-        if let Some(special) = &self.last_special {
-            let stmt = special.ident_to_stmt(&pat_ident.ident);
-            Some(stmt)
+impl DeltaFnArg {
+    // If a function argument contains a special type(s), re-write it/them.
+    fn new(fn_arg: &FnArg, suffix_iter: &mut impl Iterator<Item = String>) -> DeltaFnArg {
+        // If the function input is normal (not self, not a macro, etc) ...
+        if let Some((pat_ident, pat_type)) = DeltaFnArg::is_normal_fn_arg(fn_arg) {
+            // Replace any specials in the type with generics.
+            DeltaFnArg::replace_any_specials(pat_type.clone(), pat_ident, suffix_iter)
         } else {
-            None
-        }
-    }
-}
-
-// A function argument is normal if it is not self, not a macro, etc.
-fn is_normal_fn_arg(fn_arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
-    if let FnArg::Typed(pat_type) = fn_arg {
-        if let Pat::Ident(pat_ident) = &*pat_type.pat {
-            if let Type::Path(_) = &*pat_type.ty {
-                return Some((pat_ident, pat_type));
+            // if input is not normal, return it unchanged.
+            DeltaFnArg {
+                fn_arg: fn_arg.clone(),
+                generic_params: vec![],
+                where_predicates: vec![],
+                stmt: None,
             }
         }
     }
-    None
-}
 
-// Search type and its (sub)subtypes for specials starting at the deepest level.
-// When one is found, replace it with a generic.
-// Finally, return the new type and a list of the generic definitions.
-// Also, if the top-level type was special, return the special type.
-#[allow(clippy::ptr_arg)]
-fn replace_any_specials(
-    old_pat_type: PatType,
-    suffix_iter: &mut impl Iterator<Item = String>,
-) -> (DeltaPatType, PatType) {
-    let mut delta_pat_type = DeltaPatType {
-        // cmk define default method?
-        generic_params: vec![],
-        where_predicates: vec![],
-        suffix_iter,
-        last_special: None,
-    };
-    let new_path_type = delta_pat_type.fold_pat_type(old_pat_type);
+    // A function argument is normal if it is not self, not a macro, etc.
+    fn is_normal_fn_arg(fn_arg: &FnArg) -> Option<(&PatIdent, &PatType)> {
+        if let FnArg::Typed(pat_type) = fn_arg {
+            if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                if let Type::Path(_) = &*pat_type.ty {
+                    return Some((pat_ident, pat_type));
+                }
+            }
+        }
+        None
+    }
 
-    (delta_pat_type, new_path_type)
+    // Search type and its (sub)subtypes for specials starting at the deepest level.
+    // When one is found, replace it with a generic.
+    // Finally, return the new type and a list of the generic definitions.
+    // Also, if the top-level type was special, return the special type.
+    #[allow(clippy::ptr_arg)]
+    fn replace_any_specials(
+        old_pat_type: PatType,
+        pat_ident: &PatIdent,
+        suffix_iter: &mut impl Iterator<Item = String>,
+    ) -> DeltaFnArg {
+        let mut delta_pat_type = DeltaPatType::new(suffix_iter);
+        let new_pat_type = delta_pat_type.fold_pat_type(old_pat_type);
+
+        // Return the new function input, any statements to add, and any new generic definitions.
+        DeltaFnArg {
+            fn_arg: FnArg::Typed(new_pat_type),
+            stmt: delta_pat_type.generate_any_stmt(pat_ident),
+            generic_params: delta_pat_type.generic_params,
+            where_predicates: delta_pat_type.where_predicates,
+        }
+    }
 }
 
 struct DeltaPatType<'a> {
@@ -384,6 +383,27 @@ impl Fold for DeltaPatType<'_> {
 }
 
 impl<'a> DeltaPatType<'a> {
+    fn new(suffix_iter: &'a mut dyn Iterator<Item = String>) -> Self {
+        DeltaPatType {
+            generic_params: vec![],
+            where_predicates: vec![],
+            suffix_iter,
+            last_special: None,
+        }
+    }
+
+    fn generate_any_stmt(&self, pat_ident: &PatIdent) -> Option<Stmt> {
+        // If the top-level type is a special, add a statement to convert
+        // from its generic type to to a concrete type.
+        // For example,  "let x = x.into_iter();" for AnyIter.
+        if let Some(special) = &self.last_special {
+            let stmt = special.ident_to_stmt(&pat_ident.ident);
+            Some(stmt)
+        } else {
+            None
+        }
+    }
+
     // Define the generic type, for example, "AnyString3: AsRef<str>", and remember the definition.
     fn create_and_define_generic(
         &mut self,
