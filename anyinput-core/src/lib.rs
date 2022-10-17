@@ -471,3 +471,4 @@ fn first_and_only<T, I: Iterator<Item = T>>(mut iter: I) -> Option<T> {
 
 // todo later could nested .as_ref(), .into_iter(), and .into() be replaced with a single method or macro?
 // todo later do something interesting with 2d ndarray/views
+// todo later when does the std lib use where clauses? Is there an informal rule? Should there be an option?
