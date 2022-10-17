@@ -7,6 +7,21 @@ use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn, Stmt};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
 
+#[test]
+fn first() {
+    let before = quote! {
+        fn hello_universe() {
+            println!("Hello, universe!");
+        }
+    };
+
+    let after = anyinput_core(quote!(), before);
+    assert_eq!(
+        after.to_string(),
+        "fn hello_world () { println ! (\"Hello, world!\") ; }"
+    );
+}
+
 fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(expected: T0, actual: T1) {
     let expected = expected.to_token_stream().to_string();
     let actual = actual.to_token_stream().to_string();
@@ -767,36 +782,59 @@ fn understand_parse_quote() {
 
 #[test]
 fn conversion_combinations() {
-    // Literal code to token stream to strings
+    // Literal code to tokens, syntax, and string-of-code
     let tokens1: TokenStream = quote!(
         fn hello() {
             println!("hello world")
         }
     );
-    let string_of_code = stringify!(
-        fn hello() {
-            println!("hello world")
-        }
-    );
-    println!("{}", string_of_code);
-    let string_from_code_and_tokens: String =
-        format!("Code: {0}\nTokens: {0:?}\nPretty Tokens: {0:#?}", tokens1);
-    println!("{}", string_from_code_and_tokens);
-
-    // Literal code to syntax tree to strings
     let syntax1: ItemFn = parse_quote!(
         fn hello() {
             println!("hello world")
         }
     );
+    let string_of_code1 = stringify!(
+        fn hello() {
+            println!("hello world")
+        }
+    );
+    assert_eq!(string_of_code1, "fn hello() { println! (\"hello world\") }");
+
+    // Tokens to string-of-code & string-of-tokens
+    assert_eq!(
+        tokens1.to_string(),
+        "fn hello () { println ! (\"hello world\") }"
+    );
+    //  -- use {:#?} for the pretty-printed version
+    let string_of_tokens1 = format!("{:?}", tokens1);
+    assert!(string_of_tokens1.starts_with("TokenStream [Ident { sym: fn }"));
+
+    // Syntax to string-of-code & string-of-syntax
+    assert_eq!(
+        quote!(#syntax1).to_string(),
+        "fn hello () { println ! (\"hello world\") }"
+    );
+    //  -- use {:#?} for the pretty-printed version
+    let string_of_syntax1 = format!("{:?}", syntax1);
+    assert!(string_of_syntax1.starts_with("ItemFn { attrs: [], "));
+
+    // Tokens <--> syntax
+    let syntax2_result: Result<ItemFn, syn::Error> = parse2::<ItemFn>(tokens1.clone());
+    let syntax2: ItemFn = syntax2_result.unwrap();
+    let tokens2 = quote!(#syntax2); // or .into_token_stream()
+
+    // println!("{}", string_of_code);
+    let string_from_code_and_tokens: String =
+        format!("Code: {0}\nTokens: {0:?}\nPretty Tokens: {0:#?}", &tokens1);
+    println!("{}", string_from_code_and_tokens);
+
+    // Literal code to syntax tree to strings
     let string_of_syntax: String = format!("Syntax: {0:?}\nPretty Syntax: {0:#?}", syntax1);
     println!("{}", string_of_syntax);
 
     // Token stream to syntax tree
     // * A "proc-marco" crate uses "parse" or "parse_macro_input!".
     // * A regular crates uses "parse2"
-    let syntax2_result: Result<ItemFn, syn::Error> = parse2::<ItemFn>(tokens1);
-    let syntax2: ItemFn = syntax2_result.unwrap();
 
     // Syntax tree to token stream to string of code.
     let _tokens2: TokenStream = syntax2.clone().into_token_stream();

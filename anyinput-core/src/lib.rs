@@ -31,6 +31,14 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
     quote!(#new_item_fn)
 }
 
+// fn transform_fn(_item_fn: ItemFn) -> ItemFn {
+//     parse_quote! {
+//         fn hello_world() {
+//             println!("Hello, world!");
+//         }
+//     }
+// }
+
 fn transform_fn(item_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
     let delta_fn_arg_new = |fn_arg| DeltaFnArg::new(fn_arg, &mut suffix_iter);
