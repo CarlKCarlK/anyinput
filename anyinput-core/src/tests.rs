@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::anyinput_core;
+use crate::{anyinput_core, anyinput_core_sample};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
@@ -21,7 +21,7 @@ fn first() {
         }
     };
 
-    let after = anyinput_core(quote!(), before);
+    let after = anyinput_core_sample(quote!(), before);
     assert_eq!(
         after.to_string(),
         "fn hello_world () { println ! (\"Hello, world!\") ; }"

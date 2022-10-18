@@ -31,13 +31,29 @@ pub fn anyinput_core(args: TokenStream, input: TokenStream) -> TokenStream {
     quote!(#new_item_fn)
 }
 
-// fn transform_fn(_item_fn: ItemFn) -> ItemFn {
-//     parse_quote! {
-//         fn hello_world() {
-//             println!("Hello, world!");
-//         }
-//     }
-// }
+pub fn anyinput_core_sample(args: TokenStream, input: TokenStream) -> TokenStream {
+    if !args.is_empty() {
+        abort!(args, "anyinput does not take any arguments.")
+    }
+
+    // proc_marco2 version of "parse_macro_input!(input as ItemFn)"
+    let old_item_fn = match parse2::<ItemFn>(input) {
+        Ok(syntax_tree) => syntax_tree,
+        Err(error) => return error.to_compile_error(),
+    };
+
+    let new_item_fn = transform_fn_sample(old_item_fn);
+
+    quote!(#new_item_fn)
+}
+
+fn transform_fn_sample(_item_fn: ItemFn) -> ItemFn {
+    parse_quote! {
+        fn hello_world() {
+            println!("Hello, world!");
+        }
+    }
+}
 
 fn transform_fn(item_fn: ItemFn) -> ItemFn {
     let mut suffix_iter = simple_suffix_iter_factory();
@@ -154,12 +170,12 @@ impl Special {
         generic: &TypePath, // for example: AnyArray0
         maybe_sub_type: Option<Type>,
         maybe_lifetime: Option<Lifetime>,
-        span: &SpanRange,
+        span_range: &SpanRange,
     ) -> WherePredicate {
         match &self {
             Special::AnyString => {
                 if maybe_sub_type.is_some() {
-                    abort!(span,"AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
+                    abort!(span_range,"AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
                 };
                 assert!(
                     maybe_lifetime.is_none(),
@@ -171,7 +187,7 @@ impl Special {
             }
             Special::AnyPath => {
                 if maybe_sub_type.is_some() {
-                    abort!(span,"AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
+                    abort!(span_range,"AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
                 };
                 assert!(
                     maybe_lifetime.is_none(),
@@ -185,10 +201,11 @@ impl Special {
                 let sub_type = match maybe_sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        abort!(span,"AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
+                        abort!(span_range,"AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
                     }
                 };
                 assert!(
+                    // cmk change to abort
                     maybe_lifetime.is_none(),
                     "AnyArray should not have a lifetime."
                 );
@@ -200,10 +217,11 @@ impl Special {
                 let sub_type = match maybe_sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        abort!(span,"AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
+                        abort!(span_range,"AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
                     }
                 };
                 assert!(
+                    // cmk change to abort
                     maybe_lifetime.is_none(),
                     "AnyIter should not have a lifetime."
                 );
@@ -215,7 +233,7 @@ impl Special {
                 let sub_type = match maybe_sub_type {
                     Some(sub_type) => sub_type,
                     None => {
-                        abort!(span,"AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
+                        abort!(span_range,"AnyNdArray expects a generic parameter, for example, AnyNdArray<usize> or AnyNdArray<AnyString>.")
                     }
                 };
                 let lifetime =
@@ -373,10 +391,10 @@ struct DeltaPatType<'a> {
 
 impl Fold for DeltaPatType<'_> {
     fn fold_type_path(&mut self, type_path_old: TypePath) -> TypePath {
+        let span_range = SpanRange::from_tokens(&type_path_old); // used by abort!
+
         // Apply "fold" recursively to process specials in subtypes, for example, Vec<AnyString>.
         let type_path_middle = syn::fold::fold_type_path(self, type_path_old);
-
-        let span_range = SpanRange::from_tokens(&type_path_middle); // used by abort!
 
         // If this type is special, replace it with a generic.
         if let Some((special, maybe_sub_types)) = Special::maybe_new(&type_path_middle, &span_range)
