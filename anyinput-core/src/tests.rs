@@ -3,7 +3,13 @@
 use crate::anyinput_core;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn, Stmt};
+use syn::{
+    fold::Fold,
+    parse2, parse_quote, parse_str,
+    punctuated::Punctuated,
+    token::{Comma, Lt},
+    ItemFn, Stmt, WherePredicate,
+};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
 
@@ -882,4 +888,10 @@ fn count_statements() {
     let item_fn_new = stmt_counter.fold_item_fn(item_fn_old);
     println!("item_fn_new: {}", quote!(#item_fn_new));
     println!("count: {}", stmt_counter.count);
+}
+
+#[test]
+fn parse_quote_sample() {
+    let _lt: Lt = parse_quote!(<);
+    let _where_list: Punctuated<WherePredicate, Comma> = parse_quote!();
 }
