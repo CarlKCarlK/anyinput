@@ -2,7 +2,7 @@
 
 use crate::anyinput_core;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::{fold::Fold, parse2, parse_quote, parse_str, ItemFn, Stmt};
 #[cfg(feature = "ndarray")]
 use syn::{GenericParam, Lifetime};
@@ -22,9 +22,9 @@ fn first() {
     );
 }
 
-fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(expected: T0, actual: T1) {
-    let expected = expected.to_token_stream().to_string();
-    let actual = actual.to_token_stream().to_string();
+fn assert_tokens_eq(expected: &TokenStream, actual: &TokenStream) {
+    let expected = expected.to_string();
+    let actual = actual.to_string();
 
     if expected != actual {
         println!(
@@ -41,38 +41,34 @@ fn assert_tokens_eq<T0: ToTokens, T1: ToTokens>(expected: T0, actual: T1) {
 }
 
 #[test]
-fn one_input() -> anyhow::Result<()> {
+fn one_input() {
     let before = quote! {
-    pub fn any_str_len(s: AnyString) -> Result<usize, anyhow::Error> {
-        let len = s.len();
-        Ok(len)
+    fn any_str_len(s: AnyString) -> usize
+    {
+        s.len()
     }
-       };
+    };
     let expected = quote! {
-    pub fn any_str_len<AnyString0>(s: AnyString0) -> Result<usize, anyhow::Error>
+        fn any_str_len<AnyString0>(s: AnyString0) -> usize
     where
         AnyString0: AsRef<str>
     {
         let s = s.as_ref();
-        let len = s.len();
-        Ok(len)
+        s.len()
     }
     };
 
     let after = anyinput_core(quote!(), before);
     assert_tokens_eq(&expected, &after);
 
-    pub fn any_str_len<AnyString0>(s: AnyString0) -> Result<usize, anyhow::Error>
+    fn any_str_len<AnyString0>(s: AnyString0) -> usize
     where
         AnyString0: AsRef<str>,
     {
         let s = s.as_ref();
-        let len = s.len();
-        Ok(len)
+        s.len()
     }
-    assert_eq!(any_str_len("abc")?, 3);
-
-    Ok(())
+    assert_eq!(any_str_len("abc"), 3);
 }
 
 #[test]
@@ -783,16 +779,16 @@ fn understand_parse_quote() {
 #[test]
 fn conversion_combinations() {
     // Literal code to tokens, syntax, and string-of-code
-    let tokens1: TokenStream = quote!(
+    let tokens1: TokenStream = quote! {
         fn hello() {
             println!("hello world")
         }
-    );
-    let syntax1: ItemFn = parse_quote!(
+    };
+    let syntax1: ItemFn = parse_quote! {
         fn hello() {
             println!("hello world")
         }
-    );
+    };
     let string_of_code1 = stringify!(
         fn hello() {
             println!("hello world")
@@ -819,44 +815,38 @@ fn conversion_combinations() {
     assert!(string_of_syntax1.starts_with("ItemFn { attrs: [], "));
 
     // Tokens <--> syntax
-    let syntax2_result: Result<ItemFn, syn::Error> = parse2::<ItemFn>(tokens1.clone());
-    let syntax2: ItemFn = syntax2_result.unwrap();
-    let tokens2 = quote!(#syntax2); // or .into_token_stream()
+    let syntax2_result: Result<ItemFn, syn::Error> = parse2::<ItemFn>(tokens1);
+    let syntax2: ItemFn = syntax2_result.expect("todo: need better error");
+    let _tokens2 = quote!(#syntax2); // or .into_token_stream()
 
-    // println!("{}", string_of_code);
-    let string_from_code_and_tokens: String =
-        format!("Code: {0}\nTokens: {0:?}\nPretty Tokens: {0:#?}", &tokens1);
-    println!("{}", string_from_code_and_tokens);
-
-    // Literal code to syntax tree to strings
-    let string_of_syntax: String = format!("Syntax: {0:?}\nPretty Syntax: {0:#?}", syntax1);
-    println!("{}", string_of_syntax);
-
-    // Token stream to syntax tree
-    // * A "proc-marco" crate uses "parse" or "parse_macro_input!".
-    // * A regular crates uses "parse2"
-
-    // Syntax tree to token stream to string of code.
-    let _tokens2: TokenStream = syntax2.clone().into_token_stream();
-    let _tokens3: TokenStream = quote!(#syntax2);
-    let string_of_code2 = _tokens3.to_string();
-    println!("{}", string_of_code2);
-
-    // String of code to token stream
-    let tokens4_result: Result<TokenStream, syn::Error> =
-        parse_str("fn hello() {println!(\"hello world\")}");
-    let _tokens4: TokenStream = tokens4_result.unwrap();
-
+    // String of code to syntax or tokens
     let syntax3_result: Result<ItemFn, syn::Error> =
-        parse_str("fn hello() {println!(\"hello world\")}");
-    let _syntax3: ItemFn = syntax3_result.unwrap();
+        parse_str("fn hello () { println ! (\"hello world\") }");
+    let _syntax3 = syntax3_result.expect("todo: need better error");
+    let tokens3_result: Result<TokenStream, syn::Error> =
+        parse_str("fn hello () { println ! (\"hello world\") }");
+    let _tokens3 = tokens3_result.expect("todo: need better error");
 
-    // syn::Error to token stream
-    let tokens5_result: Result<TokenStream, syn::Error> =
-        parse_str(">)}fn hello() {println!(\"hello world\")}");
-    let error: syn::Error = tokens5_result.unwrap_err();
-    let _tokens6: TokenStream = error.to_compile_error();
-    // cmk replace prints with asserts
+    // Literal code to string-of-tokens and string-of-syntax
+    assert!(format!(
+        "{:?}",
+        quote! {
+            fn hello() {
+                println!("hello world")
+            }
+        }
+    )
+    .starts_with("TokenStream [Ident { sym: fn }"));
+    assert!(format!(
+        "{:?}",
+        parse2::<ItemFn>(quote! {
+            fn hello() {
+                println!("hello world")
+            }
+        })
+        .expect("todo: need better error")
+    )
+    .starts_with("ItemFn { attrs: [], "));
 }
 struct StmtCounter {
     count: usize,
