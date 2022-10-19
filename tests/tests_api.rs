@@ -2,14 +2,12 @@ use anyinput::anyinput;
 use std::path::PathBuf;
 
 #[test]
-fn one_input() -> Result<(), anyhow::Error> {
+fn one_input() {
     #[anyinput]
-    pub fn any_str_len1(s: AnyString) -> Result<usize, anyhow::Error> {
-        let len = s.len();
-        Ok(len)
+    pub fn any_str_len(s: AnyString) -> usize {
+        s.len()
     }
-    assert!(any_str_len1("123")? == 3);
-    Ok(())
+    assert!(any_str_len("123") == 3);
 }
 
 #[test]
@@ -189,45 +187,40 @@ fn doc_ndarray() -> Result<(), anyhow::Error> {
 
 #[test]
 fn doc_path() -> Result<(), anyhow::Error> {
-    use crate::anyinput;
-    use anyhow::Result;
+    use anyinput::anyinput;
     use std::path::Path;
 
     #[anyinput]
-    fn component_count(path: AnyPath) -> Result<usize, anyhow::Error> {
-        let count = path.iter().count();
-        Ok(count)
+    fn component_count(path: AnyPath) -> usize {
+        path.iter().count()
     }
 
     // By using AnyPath, component_count works with any
     // string-like or path-like thing, borrowed or moved.
-    assert_eq!(component_count("usr/files/home")?, 3);
+    assert_eq!(component_count("usr/files/home"), 3);
     let path = Path::new("usr/files/home");
+    assert_eq!(component_count(&path), 3);
     let pathbuf = path.to_path_buf();
-    assert_eq!(component_count(&path)?, 3);
-    assert_eq!(component_count(pathbuf)?, 3);
+    assert_eq!(component_count(pathbuf), 3);
 
     Ok(())
 }
 
 #[test]
 fn doc_iter() -> Result<(), anyhow::Error> {
-    use crate::anyinput;
-    use anyhow::Result;
+    use anyinput::anyinput;
 
     #[anyinput]
-    fn two_iterator_sum(
-        iter1: AnyIter<usize>,
-        iter2: AnyIter<AnyString>,
-    ) -> Result<usize, anyhow::Error> {
+    fn two_iterator_sum(iter1: AnyIter<usize>, iter2: AnyIter<AnyString>) -> usize {
         let mut sum = iter1.sum();
         for any_string in iter2 {
             // Needs .as_ref to turn the nested AnyString into a &str.
             sum += any_string.as_ref().len();
         }
-        Ok(sum)
+        sum
     }
-    assert_eq!(two_iterator_sum(1..=10, ["a", "bb", "ccc"])?, 61);
+
+    assert_eq!(two_iterator_sum(1..=10, ["a", "bb", "ccc"]), 61);
     Ok(())
 }
 

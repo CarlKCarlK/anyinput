@@ -48,6 +48,8 @@ pub fn anyinput_core_sample(args: TokenStream, input: TokenStream) -> TokenStrea
 }
 
 fn transform_fn_sample(_item_fn: ItemFn) -> ItemFn {
+    println!("input code  : {}", quote!(#_item_fn));
+    println!("input syntax: {:?}", _item_fn);
     parse_quote! {
         fn hello_world() {
             println!("Hello, world!");
@@ -177,10 +179,9 @@ impl Special {
                 if maybe_sub_type.is_some() {
                     abort!(span_range,"AnyString should not have a generic parameter, so 'AnyString', not 'AnyString<_>'.")
                 };
-                assert!(
-                    maybe_lifetime.is_none(),
-                    "AnyString should not have a lifetime."
-                );
+                if maybe_lifetime.is_some() {
+                    abort!(span_range, "AnyString should not have a lifetime.")
+                };
                 parse_quote! {
                     #generic : AsRef<str>
                 }
@@ -189,10 +190,9 @@ impl Special {
                 if maybe_sub_type.is_some() {
                     abort!(span_range,"AnyPath should not have a generic parameter, so 'AnyPath', not 'AnyPath<_>'.")
                 };
-                assert!(
-                    maybe_lifetime.is_none(),
-                    "AnyPath should not have a lifetime."
-                );
+                if maybe_lifetime.is_some() {
+                    abort!(span_range, "AnyPath should not have a lifetime.")
+                };
                 parse_quote! {
                     #generic : AsRef<std::path::Path>
                 }
@@ -204,11 +204,9 @@ impl Special {
                         abort!(span_range,"AnyArray expects a generic parameter, for example, AnyArray<usize> or AnyArray<AnyString>.")
                     }
                 };
-                assert!(
-                    // cmk change to abort
-                    maybe_lifetime.is_none(),
-                    "AnyArray should not have a lifetime."
-                );
+                if maybe_lifetime.is_some() {
+                    abort!(span_range, "AnyArray should not have a lifetime.")
+                };
                 parse_quote! {
                     #generic : AsRef<[#sub_type]>
                 }
@@ -220,11 +218,9 @@ impl Special {
                         abort!(span_range,"AnyIter expects a generic parameter, for example, AnyIter<usize> or AnyIter<AnyString>.")
                     }
                 };
-                assert!(
-                    // cmk change to abort
-                    maybe_lifetime.is_none(),
-                    "AnyIter should not have a lifetime."
-                );
+                if maybe_lifetime.is_some() {
+                    abort!(span_range, "AnyIter should not have a lifetime.")
+                };
                 parse_quote! {
                     #generic : IntoIterator<Item = #sub_type>
                 }
@@ -293,7 +289,6 @@ impl Special {
                 let arg = first_and_only(args.args.iter()).unwrap_or_else(|| {
                     abort!(span_range, "Expected at exactly one generic parameter.")
                 });
-                // println!("arg: {}", quote!(#arg));
                 if let GenericArgument::Type(sub_type2) = arg {
                     Some(sub_type2.clone())
                 } else {

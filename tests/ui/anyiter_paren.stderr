@@ -1,5 +1,5 @@
 error: Expected <..> generic parameter.
  --> tests/ui/anyiter_paren.rs:4:23
   |
-4 | pub fn any_str_len(s: AnyIter(AnyString)) -> Result<usize, anyhow::Error> {
+4 | pub fn any_str_len(s: AnyIter(AnyString)) -> usize {
   |                       ^^^^^^^^^^^^^^^^^^

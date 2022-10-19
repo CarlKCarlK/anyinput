@@ -54,8 +54,9 @@ fn one_input() {
         s.len()
     }
     };
+
     let expected = quote! {
-        fn any_str_len<AnyString0>(s: AnyString0) -> usize
+    fn any_str_len<AnyString0>(s: AnyString0) -> usize
     where
         AnyString0: AsRef<str>
     {
@@ -653,9 +654,8 @@ fn one_bad_input_2() {
 )]
 fn one_bad_input_3() {
     let before = quote! {
-    pub fn any_str_len(s: AnyIter(AnyString)) -> Result<usize, anyhow::Error> {
-        let len = s.len();
-        Ok(len)
+    pub fn any_str_len(s: AnyIter(AnyString)) {
+        s.len()
     }
        };
     let _after = anyinput_core(quote!(), before);
@@ -782,10 +782,11 @@ fn understand_parse_quote() {
     println!("{:#?}", &token_stream);
 }
 
+/// Also see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=7ae7d8fd405a2af5afc60ef3de9b2dad
 #[test]
 fn conversion_combinations() {
     // Literal code to tokens, syntax, and string-of-code
-    let tokens1: TokenStream = quote! {
+    let tokens1 = quote! {
         fn hello() {
             println!("hello world")
         }
@@ -854,6 +855,8 @@ fn conversion_combinations() {
     )
     .starts_with("ItemFn { attrs: [], "));
 }
+
+/// Also see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=7ae7d8fd405a2af5afc60ef3de9b2dad
 struct StmtCounter {
     count: usize,
 }

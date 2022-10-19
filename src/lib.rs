@@ -9,25 +9,22 @@
 /// # Example
 /// ```
 /// use anyinput::anyinput;
-/// use anyhow::Result;
 ///
 /// #[anyinput]
-/// fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
-///     Ok(s.len()+2)
+/// fn len_plus_2(s: AnyString) -> usize {
+///     s.len()+2
 /// }
 ///
 /// // By using AnyString, len_plus_2 works with
 /// // &str, String, or &String -- borrowed or moved.
-/// assert_eq!(len_plus_2("Hello")?, 7); // move a &str
+/// assert_eq!(len_plus_2("Hello"), 7); // move a &str
 /// let input: &str = "Hello";
-/// assert_eq!(len_plus_2(&input)?, 7); // borrow a &str
+/// assert_eq!(len_plus_2(&input), 7); // borrow a &str
 /// let input: String = "Hello".to_string();
-/// assert_eq!(len_plus_2(&input)?, 7); // borrow a String
+/// assert_eq!(len_plus_2(&input), 7); // borrow a String
 /// let input2: &String = &input;
-/// assert_eq!(len_plus_2(&input2)?, 7); // borrow a &String
-/// assert_eq!(len_plus_2(input2)?, 7); // move a &String
-/// assert_eq!(len_plus_2(input)?, 7); // move a String
-/// # // '# OK...' needed for doctest
-/// # Ok::<(), anyhow::Error>(())
+/// assert_eq!(len_plus_2(&input2), 7); // borrow a &String
+/// assert_eq!(len_plus_2(input2), 7); // move a &String
+/// assert_eq!(len_plus_2(input), 7); // move a String
 /// ```
 pub use anyinput_derive::anyinput;

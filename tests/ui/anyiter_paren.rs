@@ -1,9 +1,8 @@
 use anyinput::anyinput;
 
 #[anyinput]
-pub fn any_str_len(s: AnyIter(AnyString)) -> Result<usize, anyhow::Error> {
-    let len = s.len();
-    Ok(len)
+pub fn any_str_len(s: AnyIter(AnyString)) -> usize {
+    s.len()
 }
 
 fn main() {}

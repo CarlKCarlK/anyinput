@@ -46,50 +46,43 @@ Create a function that adds `2` to the length of any string-like thing.
 
 ```rust
 use anyinput::anyinput;
-use anyhow::Result;
 
 #[anyinput]
-fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
-    Ok(s.len()+2)
+fn len_plus_2(s: AnyString) -> usize {
+    s.len()+2
 }
 
 // By using AnyString, len_plus_2 works with
 // &str, String, or &String -- borrowed or moved.
-assert_eq!(len_plus_2("Hello")?, 7); // move a &str
+assert_eq!(len_plus_2("Hello"), 7); // move a &str
 let input: &str = "Hello";
-assert_eq!(len_plus_2(&input)?, 7); // borrow a &str
+assert_eq!(len_plus_2(&input), 7); // borrow a &str
 let input: String = "Hello".to_string();
-assert_eq!(len_plus_2(&input)?, 7); // borrow a String
+assert_eq!(len_plus_2(&input), 7); // borrow a String
 let input2: &String = &input;
-assert_eq!(len_plus_2(&input2)?, 7); // borrow a &String
-assert_eq!(len_plus_2(input2)?, 7); // move a &String
-assert_eq!(len_plus_2(input)?, 7); // move a String
-# // '# OK...' needed for doctest
-# Ok::<(), anyhow::Error>(())
+assert_eq!(len_plus_2(&input2), 7); // borrow a &String
+assert_eq!(len_plus_2(input2), 7); // move a &String
+assert_eq!(len_plus_2(input), 7); // move a String
 ```
 
 Another simple example: Create a function that counts the components of any path-like thing.
 
 ```rust
 use anyinput::anyinput;
-use anyhow::Result;
 use std::path::Path;
 
 #[anyinput]
-fn component_count(path: AnyPath) -> Result<usize, anyhow::Error> {
-    let count = path.iter().count();
-    Ok(count)
+fn component_count(path: AnyPath) -> usize {
+    path.iter().count()
 }
 
 // By using AnyPath, component_count works with any
 // string-like or path-like thing, borrowed or moved.
-assert_eq!(component_count("usr/files/home")?, 3);
+assert_eq!(component_count("usr/files/home"), 3);
 let path = Path::new("usr/files/home");
-assert_eq!(component_count(&path)?, 3);
+assert_eq!(component_count(&path), 3);
 let pathbuf = path.to_path_buf();
-assert_eq!(component_count(pathbuf)?, 3);
-# // '# OK...' needed for doctest
-# Ok::<(), anyhow::Error>(())
+assert_eq!(component_count(pathbuf), 3);
 ```
 
 As we add nesting and multiple inputs, the macro becomes more useful.
@@ -100,24 +93,18 @@ We apply the function to the range `1..=10` and a slice of `&str`'s.
 
 ```rust
 use anyinput::anyinput;
-use anyhow::Result;
 
 #[anyinput]
-fn two_iterator_sum(
-    iter1: AnyIter<usize>,
-    iter2: AnyIter<AnyString>,
-) -> Result<usize, anyhow::Error> {
+fn two_iterator_sum(iter1: AnyIter<usize>, iter2: AnyIter<AnyString>) -> usize {
     let mut sum = iter1.sum();
     for any_string in iter2 {
         // Needs .as_ref to turn the nested AnyString into a &str.
         sum += any_string.as_ref().len();
     }
-    Ok(sum)
+    sum
 }
 
-assert_eq!(two_iterator_sum(1..=10, ["a", "bb", "ccc"])?, 61);
-# // '# OK...' needed for doctest
-# Ok::<(), anyhow::Error>(())
+assert_eq!(two_iterator_sum(1..=10, ["a", "bb", "ccc"]), 61);
 ```
 
 Create a function that accepts an array-like thing of path-like things.
@@ -215,17 +202,17 @@ The `#[anyinput]` macro uses standard Rust generics to support multiple input ty
 use anyinput::anyinput;
 
 #[anyinput]
-fn len_plus_2(s: AnyString) -> Result<usize, anyhow::Error> {
-    Ok(s.len()+2)
+fn len_plus_2(s: AnyString) -> usize {
+    s.len()+2
 }
 ```
 
 into
 
 ```rust
-fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> Result<usize, anyhow::Error> {
+fn len_plus_2<AnyString0: AsRef<str>>(s: AnyString0) -> usize {
     let s = s.as_ref();
-    Ok(s.len() + 2)
+    s.len() + 2
 }
 ```
 
