@@ -856,7 +856,7 @@ fn conversion_combinations() {
     .starts_with("ItemFn { attrs: [], "));
 }
 
-/// Also see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=7ae7d8fd405a2af5afc60ef3de9b2dad
+/// Also see https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=acce21f0c87ce66cb90c4cf12103e247
 struct StmtCounter {
     count: usize,
 }
