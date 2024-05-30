@@ -391,6 +391,7 @@ fn more_iter2() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn ui() {
     let t = trybuild::TestCases::new();
