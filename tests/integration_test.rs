@@ -199,7 +199,7 @@ fn doc_path() -> Result<(), anyhow::Error> {
     // string-like or path-like thing, borrowed or moved.
     assert_eq!(component_count("usr/files/home"), 3);
     let path = Path::new("usr/files/home");
-    assert_eq!(component_count(&path), 3);
+    assert_eq!(component_count(path), 3);
     let pathbuf = path.to_path_buf();
     assert_eq!(component_count(pathbuf), 3);
 

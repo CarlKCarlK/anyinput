@@ -152,7 +152,7 @@ impl ItemFnAcc<'_> {
 // This is used to create unique names for generic types.
 // Could switch to one based on UUIDs, but this is easier to read.
 fn simple_suffix_iter_factory() -> impl Iterator<Item = String> + 'static {
-    (0usize..).into_iter().map(|i| format!("{i}"))
+    (0usize..).map(|i| format!("{i}"))
 }
 
 // Define the Specials and their properties.
