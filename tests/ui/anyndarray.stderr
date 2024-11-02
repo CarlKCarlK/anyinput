@@ -1,5 +1,5 @@
-error: Expected <..> generic parameter.
- --> tests/ui/anyndarray.rs:4:23
+error: expected `,`
+ --> tests/ui/anyndarray.rs:4:30
   |
 4 | pub fn any_str_len(s: AnyIter(AnyString)) -> Result<usize, anyhow::Error> {
-  |                       ^^^^^^^^^^^^^^^^^^
+  |                              ^

@@ -1,5 +1,4 @@
 [package]
-version = "0.1.6"
 name = "anyinput-core"
 description = "An internal helper library of anyinput"
 repository = "https://github.com/CarlKCarlK/anyinput"
@@ -26,9 +25,9 @@ colored-diff = "0.2.3"
 anyhow = "1.0"
 
 [dependencies]
-syn = { version = "1.0.60", features = ["extra-traits", "full", "fold"] }
+syn = { version = "2.0.87", features = ["extra-traits", "full", "fold"] }
 quote = "1.0.9"
 proc-macro2 = "1.0.24"
-strum = { version = "0.24", features = ["derive"] }
-ndarray = { version = "0.15.4", optional = true }
+strum = { version = "0.26", features = ["derive"] }
+ndarray = { version = "0.16.1", optional = true }
 proc-macro-error = "1.0"
