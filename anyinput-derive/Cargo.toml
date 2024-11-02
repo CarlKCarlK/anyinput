@@ -1,5 +1,6 @@
 [package]
 name = "anyinput-derive"
+version = "0.1.8"
 description = "An internal helper library of anyinput"
 repository = "https://github.com/CarlKCarlK/anyinput"
 readme = "README.md"
@@ -19,6 +20,6 @@ proc-macro = true
 ndarray = ["anyinput-core/ndarray"]
 
 [dependencies]
-anyinput-core = { path = "../anyinput-core" }
+anyinput-core = { version = "0.1.8", path = "../anyinput-core" }
 proc-macro-error = "1.0"
 proc-macro2 = "1.0"

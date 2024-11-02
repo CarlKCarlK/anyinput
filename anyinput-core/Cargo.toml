@@ -1,5 +1,6 @@
 [package]
 name = "anyinput-core"
+version = "0.1.8"
 description = "An internal helper library of anyinput"
 repository = "https://github.com/CarlKCarlK/anyinput"
 readme = "README.md"

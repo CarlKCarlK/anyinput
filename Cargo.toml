@@ -27,4 +27,4 @@ ndarray = { version = "0.16.1" }
 trybuild = "1.0.101"
 
 [dependencies]
-anyinput-derive = { path = "anyinput-derive" }
+anyinput-derive = { version = "0.1.8", path = "anyinput-derive" }
